@@ -2,7 +2,9 @@
 *
 !*/
 !.gitignore
+!.gitattributes
 !README.md
+!LICENSE
 !*.md
 !*.py
 !*.ts
@@ -11,9 +13,18 @@
 !*.toml
 !*.yaml
 !*.yml
+!*.sh
+!*.service
+!*.plist
+!*.txt
+!*.timer
+!*.conf
 !Dockerfile
 !.env.example
-# Never commit secrets, credentials, campaign data or transcripts.
+!.githooks/*
+!.github/**
+
+# Never commit secrets, credentials, campaign data, transcripts or local names.
 .env
 .env.*
 !.env.example
@@ -27,3 +38,15 @@ logs/
 *.log
 node_modules/
 .venv/
+__pycache__/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.claude/
+# Local-only files that hold real names, real questions and exports.
+.privacy-denylist*
+!.privacy-denylist.example
+eval-questions*.local.*
+Analecta-export/
+export/

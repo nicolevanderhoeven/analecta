@@ -1,0 +1,4 @@
+#!/bin/sh
+# Runs the privacy check on what is staged. Install once with: scripts/install-hooks.sh
+root="$(git rev-parse --show-toplevel)" || exit 1
+exec python3 "$root/scripts/privacy_check.py"
