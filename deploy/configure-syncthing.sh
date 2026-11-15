@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Configure the droplet's Syncthing: one receive-only folder with simple versioning, no discovery,
+# Configure the droplet's Syncthing: the notes folder (receive-only, simple versioning) and the corrections folder
+# (send-only, so the Mac can review table corrections and flagged answers but nothing flows back), no discovery,
 # no relays, no NAT traversal (the Mac connects to the droplet; the droplet never announces itself).
 # Run as root on the droplet, after setup-droplet.sh. Safe to re-run.
 #
@@ -13,6 +14,8 @@ ST_HOME="${ST_HOME:-/home/$SVC_USER/.local/state/syncthing}"
 FOLDER_ID="${FOLDER_ID:-analecta-notes}"
 FOLDER_PATH="${FOLDER_PATH:-/srv/analecta/notes}"
 KEEP_VERSIONS="${KEEP_VERSIONS:-5}"
+CORRECTIONS_FOLDER_ID="${CORRECTIONS_FOLDER_ID:-analecta-corrections}"
+CORRECTIONS_PATH="${CORRECTIONS_PATH:-/srv/analecta/corrections}"
 MAC_DEVICE_ID="${MAC_DEVICE_ID:-}"
 RUN_AS=()
 if [ "$(id -u)" -eq 0 ]; then RUN_AS=(sudo -u "$SVC_USER"); fi
@@ -44,11 +47,22 @@ if ! st config folders "$FOLDER_ID" devices list | grep -qx "$MAC_DEVICE_ID"; th
   st config folders "$FOLDER_ID" devices add --device-id "$MAC_DEVICE_ID"
 fi
 
+echo "== the send-only corrections folder (the bot writes it; the Mac only receives)"
+if ! st config folders list | grep -qx "$CORRECTIONS_FOLDER_ID"; then
+  st config folders add --id "$CORRECTIONS_FOLDER_ID" --label "$CORRECTIONS_FOLDER_ID" --path "$CORRECTIONS_PATH" --type sendonly
+fi
+st config folders "$CORRECTIONS_FOLDER_ID" type set sendonly
+if ! st config folders "$CORRECTIONS_FOLDER_ID" devices list | grep -qx "$MAC_DEVICE_ID"; then
+  st config folders "$CORRECTIONS_FOLDER_ID" devices add --device-id "$MAC_DEVICE_ID"
+fi
+
 echo "== the default folder is not wanted"
 st config folders list | grep -qx default && st config folders default delete || true
 
 echo "== summary"
 st config folders "$FOLDER_ID" dump-json | python3 -c \
   'import sys,json; d=json.load(sys.stdin); print("type:", d["type"], "| versioning:", d["versioning"]["type"], d["versioning"]["params"])'
+st config folders "$CORRECTIONS_FOLDER_ID" dump-json | python3 -c \
+  'import sys,json; d=json.load(sys.stdin); print("corrections type:", d["type"])'
 echo "This droplet's device ID (give it to the Mac's Syncthing):"
 st show system | python3 -c 'import sys,json; print(json.load(sys.stdin)["myID"])'

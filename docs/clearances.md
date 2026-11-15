@@ -28,18 +28,27 @@ What they say that matters here:
 - Policy rule 15: API Data may be used only as necessary to provide the application's stated functionality. The
   stated function is answering questions in one channel, which is exactly what the message text is used for.
 - Policy rules 16, 17, 18, 20: no profiling of users, no data brokers, no selling, no scraping. Analecta does none.
-  It keeps no message history and logs no message text or user IDs.
+  It keeps no message history and logs no message text or user IDs. The one exception is what a member chooses to
+  flag or correct (see the note after this list).
 - Developer Terms section 5(b): API Data may not be shared with third parties except a "Service Provider",
   defined as "a person or entity you use to provide you services to develop or operate your Application". OpenAI,
   the model provider the bot calls to answer, is such a provider. Nothing is shared with anyone else.
 - Developer Terms section 5(a): the application needs a privacy policy that says what data goes to third parties,
   linked in the Developer Portal. That policy is [privacy.md](privacy.md). **Before launch:** paste its public URL
   into the application's "Privacy Policy URL" field in the Developer Portal.
-- Developer Terms section 5(b) also requires deleting API Data when no longer needed. Analecta stores none.
+- Developer Terms section 5(b) also requires deleting API Data when no longer needed. Analecta stores none, apart
+  from the member-initiated flags and corrections described in the note after this list.
 - Reading message text needs the privileged Message Content intent, switched on in the Developer Portal.
 
 Conditions that keep this clearance valid: inference only, no training, no data-sharing opt-in on the OpenAI
 project, privacy policy linked, the group told before launch.
+
+**Not covered by the checks above (open item).** Table corrections and the misread list store member-chosen content
+on the server: a flagged question and answer, or a correction, with the member's display name and the time. The
+checks above were made before this feature. Before it goes live, re-read Discord's Developer Policy on storing
+message content and confirm that saving only what a member explicitly flags or corrects, in a private channel the
+group controls, is allowed; the group is told by the pinned note and [privacy.md](privacy.md). The saved text is
+also sent to OpenAI inside the answer prompt, under the same terms as the notes.
 
 ## 2. OpenAI API data terms
 

@@ -4,6 +4,7 @@ import asyncio
 
 from analecta.agent import Agent
 from analecta.aon import AonClient
+from analecta.corrections import CorrectionStore
 from analecta.llm.base import Message, ModelTurn, ToolCall, Usage
 from analecta.notes import NotesStore
 from analecta.prompts import build_system_prompt
@@ -19,10 +20,10 @@ class Scripted:
         return self.turns.pop(0)
 
 
-def make_agent(exported, turns, max_turns=4):
+def make_agent(exported, turns, max_turns=4, corrections=None):
     prov = Scripted(turns)
     aon = AonClient(enabled=False)
-    return Agent(prov, NotesStore(exported), aon, build_system_prompt, max_turns), prov
+    return Agent(prov, NotesStore(exported), aon, build_system_prompt, max_turns, corrections=corrections), prov
 
 
 def call(i, name, **args):
@@ -163,3 +164,52 @@ def test_digest_description_alone_is_not_the_only_source(exported):
     assert "A young lamplighter." in prov.seen[0][0]
     assert "ferry cat" not in prov.seen[0][0]
     assert any("ferry cat" in t for t in _seen_reads(prov))
+
+
+# -- table corrections come ahead of the notes --------------------------------------------------------------
+def _corrections(tmp_path, *texts):
+    from datetime import datetime, timezone
+
+    store = CorrectionStore(tmp_path / "data", clock=lambda: datetime(2026, 11, 12, 14, 3, tzinfo=timezone.utc))
+    for t in texts:
+        store.add_correction(t, "Alex")
+    return store
+
+
+def test_table_corrections_reach_the_model_ahead_of_the_notes(exported, tmp_path):
+    _add_entity(exported)
+    store = _corrections(tmp_path, "Pip Tarn is a lamplighter's apprentice, not a lamplighter")
+    agent, prov = make_agent(exported, [ModelTurn("ok", [])], corrections=store)
+    res = asyncio.run(agent.answer([Message("user", "Who is Pip Tarn?")]))
+    first = prov.seen[0][1]
+    assistant = [m for m in first if m.role == "assistant"][0]
+    assert [c.name for c in assistant.tool_calls] == ["table_corrections", "read_note"]
+    tools = [m for m in first if m.role == "tool"]
+    assert "(12 Nov 2026) Pip Tarn is a lamplighter's apprentice" in tools[0].text and "Alex" not in tools[0].text
+    assert "ferry cat" in tools[1].text  # the note follows the correction
+    assert [m.tool_call_id for m in tools] == [c.id for c in assistant.tool_calls]
+    assert res.tools_used == ["table_corrections", "read_note"]
+
+
+def test_corrections_reach_the_model_even_when_no_note_is_named(exported, tmp_path):
+    store = _corrections(tmp_path, "The ferry is free on market days")
+    agent, prov = make_agent(exported, [ModelTurn("ok", [])], corrections=store)
+    asyncio.run(agent.answer([Message("user", "what does the ferry cost?")]))
+    tools = [m for m in prov.seen[0][1] if m.role == "tool"]
+    assert len(tools) == 1 and "ferry is free" in tools[0].text
+
+
+def test_no_corrections_means_nothing_extra(exported, tmp_path):
+    agent, prov = make_agent(exported, [ModelTurn("ok", [])], corrections=_corrections(tmp_path))
+    res = asyncio.run(agent.answer([Message("user", "How does grapple work?")]))
+    assert [m for m in prov.seen[0][1] if m.role == "tool"] == [] and res.tools_used == []
+
+
+def test_corrections_are_reread_when_the_file_changes_and_system_prompt_explains_precedence(exported, tmp_path):
+    store = _corrections(tmp_path, "first fix about the ferry")
+    agent, prov = make_agent(exported, [ModelTurn("ok", []), ModelTurn("ok", [])], corrections=store)
+    asyncio.run(agent.answer([Message("user", "ferry?")]))
+    store.add_correction("second fix about the ferry", "Sam")
+    asyncio.run(agent.answer([Message("user", "ferry?")]))
+    assert "second fix" not in prov.seen[0][1][-1].text and "second fix" in prov.seen[1][1][-1].text
+    assert "table correction from 12 Nov" in prov.seen[0][0] and "Treat a correction as true" in prov.seen[0][0]

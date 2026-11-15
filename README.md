@@ -25,9 +25,14 @@ Not published, endorsed, or specifically approved by Paizo.
   the digest's short description.
 - **Rules come live from Archives of Nethys** through the site's own search backend, with a link to the exact page,
   a short cache, a low request rate, a back-off on failures and a switch to turn it off (`AON_ENABLED=false`).
+- **The group can correct it.** Reply to an answer with `/correct <the fix>` and it is saved as a *table correction*
+  (with who and when) in `corrections.md`; later answers use those ahead of the notes and say so. A 👎 on an answer,
+  or a reply saying "wrong", logs the question and answer to a review list, `misreads.md`. Both live outside the
+  notes folder and go back to the Mac for review through a second, send-only Syncthing folder. The server's copy of the
+  notes is never changed. See [docs/operations.md](docs/operations.md).
 - **Named channels only.** The bot answers only in the configured server and channel pairs (`DISCORD_CHANNELS`, or the older
   `DISCORD_GUILD_ID` plus `DISCORD_CHANNEL_ID`; each channel is tied to its own server), only when mentioned or replied to, and ignores DMs and every other channel and server. Channel permissions are the access control. The reply chain is
-  the conversation memory; nothing is stored.
+  the conversation memory; the only things stored are the corrections and flags members choose to add.
 - **Provider-neutral.** `analecta.llm.base.LLMProvider` is the only thing the agent loop knows. OpenAI is the one
   implementation; the model is configuration (`LLM_MODEL`).
 - **What the bot can see is decided by the export, not by prompts.** The export script writes only campaign notes and
@@ -48,7 +53,7 @@ address, real names and the real notes never enter it.
 
 ## Documentation
 
-- [docs/deployment.md](docs/deployment.md): droplet, Syncthing, Mac export job, Discord setup, go-live checklist.
+- [docs/deployment.md](docs/deployment.md): droplet, Syncthing (notes out, corrections back), Mac export job, Discord setup, go-live checklist.
 - [docs/clearances.md](docs/clearances.md): Discord, OpenAI and ORC checks, with sources.
 - [docs/pinned-note.md](docs/pinned-note.md): the help text and the pinned note.
 - [docs/privacy.md](docs/privacy.md): the privacy policy for the group.
