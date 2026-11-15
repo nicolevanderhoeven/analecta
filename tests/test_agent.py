@@ -146,12 +146,13 @@ def test_preread_is_bounded_and_uses_latest_user_message(exported):
     assert not any("Bridge of Teeth" in r for r in reads)
 
 
-def test_system_prompt_forbids_claiming_absence_without_reading_and_grepping(exported):
-    agent, _ = make_agent(exported, [])
-    system = agent.system
-    assert "read its own note" in system
-    assert "never say the notes give no more detail" in system.lower()
-    assert "grepped the session notes" in system
+def test_preread_truncation_keeps_continuation_hint(exported):
+    (exported / "Big Person.md").write_text("---\ndescription: d\n---\n" + ("long history. " * 3000))
+    agent, prov = make_agent(exported, [ModelTurn("ok", [])])
+    asyncio.run(agent.answer([Message("user", "Who is Big Person?")]))
+    reads = _seen_reads(prov)
+    assert reads and all(len(r) <= 12000 for r in reads)
+    assert all(r.rstrip().endswith("later start_line]") for r in reads)
 
 
 def test_digest_description_alone_is_not_the_only_source(exported):

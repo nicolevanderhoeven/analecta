@@ -13,6 +13,7 @@ from .notes import NotesError, NotesStore
 log = logging.getLogger("analecta.agent")
 
 MAX_TOOL_RESULT_CHARS = 12000
+PREREAD_CUT = "\n[truncated; call read_note again with a later start_line]"
 MAX_PREREAD_CHARS = 24000  # total across all notes read up front
 
 TOOLS: list[ToolSpec] = [
@@ -139,7 +140,9 @@ class Agent:
                 out = self.notes.read(info.path, 1, 400)
             except (NotesError, OSError):
                 continue
-            out = out[: min(budget, MAX_TOOL_RESULT_CHARS)]
+            limit = min(budget, MAX_TOOL_RESULT_CHARS)
+            if len(out) > limit:
+                out = out[: max(0, limit - len(PREREAD_CUT))] + PREREAD_CUT
             budget -= len(out)
             call = ToolCall(id=f"preread{n}", name="read_note", arguments={"path": info.path})
             calls.append(call)
