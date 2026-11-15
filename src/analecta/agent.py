@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
 from .aon import AonClient
+from .corrections import CorrectionStore
 from .llm.base import LLMProvider, Message, ModelTurn, ToolCall, ToolSpec, Usage
 from .notes import NotesError, NotesStore
 
@@ -73,9 +74,11 @@ class AgentResult:
 
 class Agent:
     def __init__(self, provider: LLMProvider, notes: NotesStore, aon: AonClient,
-                 system_builder: Callable[[str], str], max_turns: int = 8):
+                 system_builder: Callable[[str], str], max_turns: int = 8,
+                 corrections: CorrectionStore | None = None):
         self.provider = provider
         self.notes = notes
+        self.corrections = corrections
         self.aon = aon
         self.max_turns = max_turns
         self._system_builder = system_builder
@@ -121,17 +124,25 @@ class Agent:
         return out
 
     def preread_messages(self, history: list[Message]) -> list[Message]:
-        """Notes named in the latest user question, as already-made read_note calls and their results.
+        """Already-made tool calls and results placed before the model's first turn.
 
-        The model otherwise tends to answer from the one-line digest description and never open the note.
+        First the group's table corrections that bear on the conversation (they take precedence over the notes, so
+        they come ahead of them), then the notes named in the latest user question as read_note results. The model
+        otherwise tends to answer from the one-line digest description and never open the note.
         """
+        calls: list[ToolCall] = []
+        outputs: list[Message] = []
+        context = " ".join(m.text for m in history if m.role in ("user", "assistant"))
+        block = self.corrections.prompt_block(context) if self.corrections else ""
+        if block:
+            call = ToolCall(id="corrections1", name="table_corrections", arguments={})
+            calls.append(call)
+            outputs.append(Message(role="tool", text=block, tool_call_id=call.id))
         question = next((m.text for m in reversed(history) if m.role == "user"), "")
         try:
             infos = self.notes.match_entities(question)
         except OSError:
-            return []
-        calls: list[ToolCall] = []
-        outputs: list[Message] = []
+            infos = []
         budget = MAX_PREREAD_CHARS
         for n, info in enumerate(infos, 1):
             if budget <= 0:
@@ -158,7 +169,7 @@ class Agent:
         pre = self.preread_messages(history)
         if pre:
             messages.extend(pre)
-            result.tools_used.extend("read_note" for _ in pre[0].tool_calls)
+            result.tools_used.extend(c.name for c in pre[0].tool_calls)
         for turn_no in range(1, self.max_turns + 1):
             last = turn_no == self.max_turns
             turn: ModelTurn = await self.provider.step(

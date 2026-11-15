@@ -8,6 +8,8 @@
 # What it does: a non-root service user, Python venv with the bot, a hardened systemd service,
 # a firewall that allows only SSH and Syncthing's sync port, automatic security updates, and
 # Syncthing (running as the service user, GUI on localhost only).
+# The corrections folder (/srv/analecta/corrections) is separate from the notes: the bot writes table corrections
+# and flagged answers there, and configure-syncthing.sh sends it to the Mac (send-only).
 # What it does NOT do: put any secret on the box. Create /etc/analecta/analecta.env yourself (see docs/deployment.md).
 set -euo pipefail
 
@@ -20,6 +22,7 @@ LOCAL_SRC="${ANALECTA_LOCAL_SRC:-}"
 SVC_USER=analecta
 APP_DIR=/opt/analecta
 NOTES_DIR=/srv/analecta/notes
+CORRECTIONS_DIR=/srv/analecta/corrections
 ENV_DIR=/etc/analecta
 
 [ "$(id -u)" -eq 0 ] || { echo "Run as root." >&2; exit 1; }
@@ -41,6 +44,7 @@ systemctl enable --now unattended-upgrades
 echo "== service user and folders"
 id "$SVC_USER" >/dev/null 2>&1 || useradd --system --create-home --home-dir "/home/$SVC_USER" --shell /usr/sbin/nologin "$SVC_USER"
 install -d -o "$SVC_USER" -g "$SVC_USER" -m 750 "$NOTES_DIR"
+install -d -o "$SVC_USER" -g "$SVC_USER" -m 750 "$CORRECTIONS_DIR"   # the bot writes here; Syncthing sends it to the Mac
 install -d -o root -g "$SVC_USER" -m 750 "$ENV_DIR"
 
 echo "== firewall: SSH and Syncthing sync only"

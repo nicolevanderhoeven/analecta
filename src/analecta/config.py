@@ -72,12 +72,21 @@ class Settings:
     reasoning_effort: str
     max_tool_turns: int
     notes_dir: Path
+    corrections_dir: Path
     aon_enabled: bool
     aon_cache_seconds: int
     aon_min_interval: float
     aon_user_agent: str
     user_cooldown: float
     daily_limit: int
+
+
+DEFAULT_CORRECTIONS_DIR = "/srv/analecta/corrections"
+
+
+def _overlaps(a: Path, b: Path) -> bool:
+    a, b = a.resolve(), b.resolve()
+    return a == b or a in b.parents or b in a.parents
 
 
 def load_env_file(path: str | os.PathLike[str]) -> None:
@@ -132,6 +141,11 @@ def load_settings(env: dict[str, str] | None = None, *, need_discord: bool = Tru
     if len(set(channels)) != len(channels):
         raise ConfigError("DISCORD_CHANNELS lists the same server and channel more than once")
 
+    notes_dir = Path(notes).expanduser()
+    corrections_dir = Path(env.get("CORRECTIONS_DIR", "").strip() or DEFAULT_CORRECTIONS_DIR).expanduser()
+    if _overlaps(notes_dir, corrections_dir):
+        raise ConfigError("CORRECTIONS_DIR must be a separate folder from NOTES_DIR (the notes are read-only)")
+
     return Settings(
         discord_token=token,
         channels=tuple(channels),
@@ -140,7 +154,8 @@ def load_settings(env: dict[str, str] | None = None, *, need_discord: bool = Tru
         api_key=api_key,
         reasoning_effort=env.get("LLM_REASONING_EFFORT", "low").strip(),
         max_tool_turns=_int(env, "LLM_MAX_TOOL_TURNS", 8),
-        notes_dir=Path(notes).expanduser(),
+        notes_dir=notes_dir,
+        corrections_dir=corrections_dir,
         aon_enabled=_flag(env.get("AON_ENABLED"), True),
         aon_cache_seconds=_int(env, "AON_CACHE_SECONDS", 900),
         aon_min_interval=_float(env, "AON_MIN_INTERVAL_SECONDS", 2.0),

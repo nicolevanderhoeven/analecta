@@ -13,7 +13,9 @@ group.
 
 **What I can see:** the messages in the reply chain you start, the group's exported campaign notes (session notes and character, place and faction notes only; "Secret goals" sections, hidden comments, notes not yet met in play and notes marked `bot: false` are never exported), and live pages on Archives of Nethys. No Discord history, no transcripts, nothing else.
 
-**Where questions go:** your question and the note passages needed to answer it are sent to OpenAI's API. OpenAI states that API data is not used to train its models by default and is kept for up to 30 days for abuse monitoring. I do not store your questions.
+**Where questions go:** your question and the note passages needed to answer it are sent to OpenAI's API. OpenAI states that API data is not used to train its models by default and is kept for up to 30 days for abuse monitoring. I do not store your questions, except as described next.
+
+**Fixing me:** if I misread the notes, react 👎 to my answer or reply to it with "wrong". I save that question and my answer, with your display name, in a review list for my owner; nothing else changes. If the notes themselves are wrong or missing something, reply to my answer with `/correct` and the fix, for example `/correct Mira is Tobin's sister, not his cousin`. I save it, with your display name and the date, as a table correction, use it ahead of the notes and say so. Both lists stay on the group's server and go to my owner's Mac for review; a table correction that bears on a question is sent to OpenAI along with the notes passages. Anyone in this channel can add one.
 
 **Rules answers** come from live Archives of Nethys lookups and end with a link to the exact page. Check the page if it matters at the table.
 

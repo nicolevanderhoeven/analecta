@@ -9,6 +9,36 @@
 | Change the model | Set `LLM_MODEL` (and `LLM_PROVIDER` once another provider is added), then restart. |
 | Daily and per-person limits | `DAILY_QUESTION_LIMIT`, `USER_COOLDOWN_SECONDS`. |
 
+## Corrections and flagged answers
+
+Members correct the bot in the channel; the bot never edits the notes.
+
+| Member does | Bot does |
+|---|---|
+| Replies to an answer with `/correct <the fix>` (`!correct` also works) | Appends it to `corrections.md` with their display name, the time and the question it was about, and replies "Saved as a table correction". Up to 500 characters. |
+| Reacts 👎 to an answer, or replies to it with just "wrong" | Appends the question, the answer, who and when to `misreads.md` (once per answer) and replies "Logged for review". |
+
+Only replies and reactions in the configured channels (and threads under them), on the bot's own messages, count.
+Everything else is ignored. A `/correct` or "wrong" that is not a reply to an answer does nothing (a `/correct` that
+mentions the bot gets a one-line hint).
+
+Both files live in `CORRECTIONS_DIR` (default `/srv/analecta/corrections`), outside the notes folder, and are sent to
+the Mac by the send-only Syncthing folder (see [deployment.md](deployment.md)). The format is plain Markdown, one
+bullet per correction: `- [2026-11-12 14:03 UTC] **Name**: text`. Lines that do not match are ignored, so notes
+typed into the file are harmless.
+
+**How corrections reach answers.** Before the model's first turn the bot adds the table corrections to the
+conversation as a `table_corrections` result, ahead of any note it reads. The system prompt tells the model to treat
+a correction as true where the notes disagree, to say so with its date ("per a table correction from 12 Nov"), and to
+let a later correction replace an earlier one. Names are not sent, only the date and the text. To keep the cost
+bounded: while all corrections fit in 3,000 characters (about 750 tokens) they are all included; beyond that only
+those sharing a word with the conversation are, newest first, up to that same cap. The file is re-read whenever it
+changes, so an edit on the server takes effect on the next question. Removing a correction is manual; see
+[deployment.md](deployment.md#reviewing-corrections-on-the-mac-and-removing-one).
+
+If the folder cannot be written (wrong owner, folder missing), the bot answers "I could not save that just now" and
+logs `could not save feedback` with no message text. `journalctl -u analecta` shows it.
+
 ## Spend cap
 
 The hard cap is set on the OpenAI side: create a dedicated project for Analecta and set its monthly budget to 25 USD

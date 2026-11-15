@@ -26,6 +26,7 @@ def main(argv: list[str] | None = None) -> int:
     from .agent import Agent
     from .aon import AonClient
     from .bot import AnalectaBot
+    from .corrections import CorrectionStore
     from .gating import Limiter
     from .llm import make_provider
     from .notes import NotesStore
@@ -41,9 +42,17 @@ def main(argv: list[str] | None = None) -> int:
         min_interval=settings.aon_min_interval,
         user_agent=settings.aon_user_agent,
     )
-    agent = Agent(make_provider(settings), notes, aon, build_system_prompt, settings.max_tool_turns)
+    corrections = CorrectionStore(settings.corrections_dir)
+    try:
+        settings.corrections_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        print(f"Warning: cannot create the corrections folder {settings.corrections_dir}; "
+              "saving corrections and flags will fail until it exists and is writable.", file=sys.stderr)
+    agent = Agent(make_provider(settings), notes, aon, build_system_prompt, settings.max_tool_turns,
+                  corrections=corrections)
     bot = AnalectaBot(
         agent=agent,
+        corrections=corrections,
         locations=settings.channels,
         limiter=Limiter(settings.user_cooldown, settings.daily_limit),
     )
