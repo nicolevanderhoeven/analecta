@@ -1,3 +1,5 @@
-# Unkillers bot
+# Analecta
 
-Discord bot for the Undead Unkillers Pathfinder 2e group: answers rules questions with links to the source, and campaign questions from the campaign notes.
+A Discord bot for a Pathfinder 2e gaming group. It answers rules questions with links to the source on Archives of Nethys, and questions about the group's campaign from an exported folder of Markdown notes.
+
+Not published, endorsed, or specifically approved by Paizo.
