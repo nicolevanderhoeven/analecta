@@ -1,0 +1,37 @@
+[Unit]
+Description=Analecta Discord bot
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/analecta/analecta.env
+
+[Service]
+Type=simple
+User=analecta
+Group=analecta
+WorkingDirectory=/opt/analecta
+EnvironmentFile=/etc/analecta/analecta.env
+ExecStart=/opt/analecta/.venv/bin/python -m analecta
+Restart=on-failure
+RestartSec=10
+
+# Hardening: the bot needs outbound network and read access to the notes, nothing else.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadOnlyPaths=/srv/analecta/notes
+InaccessiblePaths=/home /root
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,4 @@
+# Copy to .privacy-denylist (untracked) and list real character, player and place names,
+# one per line, case-insensitive. Lines starting with # are comments.
+# The check scans every tracked file for these. The real list never gets committed.
+Example Character Name

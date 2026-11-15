@@ -1,0 +1,56 @@
+"""Entry point: `python -m analecta` runs the bot; `python -m analecta pinned` prints the pinned note."""
+from __future__ import annotations
+
+import logging
+import os
+import sys
+
+from .config import ConfigError, load_env_file, load_settings
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["pinned"]:
+        from .clearances import PINNED_NOTE
+
+        print(PINNED_NOTE)
+        return 0
+    load_env_file(os.environ.get("ANALECTA_ENV_FILE", ".env"))
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    try:
+        settings = load_settings()
+    except ConfigError as exc:
+        print(f"Configuration problem: {exc}", file=sys.stderr)
+        return 2
+    # Imports after settings so a config error is reported before heavy imports.
+    from .agent import Agent
+    from .aon import AonClient
+    from .bot import AnalectaBot
+    from .gating import Limiter
+    from .llm import make_provider
+    from .notes import NotesStore
+    from .prompts import build_system_prompt
+
+    notes = NotesStore(settings.notes_dir)
+    digest = notes.digest()
+    if len(digest) < 100:
+        print("Warning: the notes folder looks empty; is Syncthing delivering the export?", file=sys.stderr)
+    aon = AonClient(
+        enabled=settings.aon_enabled,
+        cache_seconds=settings.aon_cache_seconds,
+        min_interval=settings.aon_min_interval,
+        user_agent=settings.aon_user_agent,
+    )
+    agent = Agent(make_provider(settings), notes, aon, build_system_prompt, settings.max_tool_turns)
+    bot = AnalectaBot(
+        agent=agent,
+        channel_id=settings.channel_id,
+        guild_id=settings.guild_id,
+        limiter=Limiter(settings.user_cooldown, settings.daily_limit),
+    )
+    bot.run(settings.discord_token, log_handler=None)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
