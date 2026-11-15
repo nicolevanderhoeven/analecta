@@ -83,5 +83,5 @@ def test_system_prompt_rebuilds_when_notes_change(exported):
     first = agent.system
     assert "Zed Novelty" not in first
     (exported / "Zed Novelty.md").write_text("---\ndescription: brand new\n---\nx")
-    agent._checked = 0  # skip the once-a-minute throttle
+    agent._checked = float("-inf")  # skip the once-a-minute throttle (monotonic() can be < 60 on a fresh CI runner)
     assert "Zed Novelty" in agent.system
