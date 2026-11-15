@@ -2,7 +2,7 @@
 
 Analecta is a small Discord bot for one Pathfinder 2e gaming group. This is what it does with data.
 
-**What it reads.** Only messages in the one channel it is set up for that mention it or reply to it, and the
+**What it reads.** Only messages in the channels it is set up for (one per server it has been added to) that mention it or reply to it, and the
 earlier messages in that reply chain. It ignores direct messages and every other channel and server.
 
 **What it sends to a third party.** To answer, it sends the question, the reply chain, and the passages of the

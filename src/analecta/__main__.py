@@ -44,8 +44,7 @@ def main(argv: list[str] | None = None) -> int:
     agent = Agent(make_provider(settings), notes, aon, build_system_prompt, settings.max_tool_turns)
     bot = AnalectaBot(
         agent=agent,
-        channel_id=settings.channel_id,
-        guild_id=settings.guild_id,
+        locations=settings.channels,
         limiter=Limiter(settings.user_cooldown, settings.daily_limit),
     )
     bot.run(settings.discord_token, log_handler=None)

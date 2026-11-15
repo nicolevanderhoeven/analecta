@@ -23,8 +23,8 @@ Not published, endorsed, or specifically approved by Paizo.
   descriptions (about 10K tokens) sits in the cached system prompt so nicknames and aliases resolve before searching.
 - **Rules come live from Archives of Nethys** through the site's own search backend, with a link to the exact page,
   a short cache, a low request rate, a back-off on failures and a switch to turn it off (`AON_ENABLED=false`).
-- **One channel, one audience.** The bot answers only in the one configured channel, only when mentioned or replied to,
-  and ignores DMs and every other channel and server. Channel permissions are the access control. The reply chain is
+- **Named channels only.** The bot answers only in the configured server and channel pairs (`DISCORD_CHANNELS`; one
+  pair is enough), only when mentioned or replied to, and ignores DMs and every other channel and server. Channel permissions are the access control. The reply chain is
   the conversation memory; nothing is stored.
 - **Provider-neutral.** `analecta.llm.base.LLMProvider` is the only thing the agent loop knows. OpenAI is the one
   implementation; the model is configuration (`LLM_MODEL`).

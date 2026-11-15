@@ -1,8 +1,9 @@
-"""Discord front end: one channel, mention or reply to ask, reply chain is the conversation memory."""
+"""Discord front end: configured channels, mention or reply to ask, reply chain is the conversation memory."""
 from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Iterable
 
 import discord
 
@@ -19,25 +20,24 @@ HELP_WORDS = {"help", "about", "?", "what can you see", "what do you see"}
 
 
 class AnalectaBot(discord.Client):
-    def __init__(self, *, agent: Agent, channel_id: int, guild_id: int | None, limiter: Limiter):
+    def __init__(self, *, agent: Agent, locations: Iterable[tuple[int | None, int]], limiter: Limiter):
         intents = discord.Intents.none()
         intents.guilds = True
         intents.guild_messages = True
         intents.message_content = True  # privileged: enable "Message Content Intent" in the developer portal
         super().__init__(intents=intents, allowed_mentions=discord.AllowedMentions.none())
         self.agent = agent
-        self.channel_id = channel_id
-        self.guild_id = guild_id
+        self.locations = tuple(locations)
         self.limiter = limiter
         self._slots = asyncio.Semaphore(2)
 
     async def on_ready(self) -> None:
-        log.info("ready; watching one configured channel")
+        log.info("ready; watching %d configured channel(s)", len(self.locations))
 
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot or self.user is None:
             return
-        if not is_allowed_location(message, channel_id=self.channel_id, guild_id=self.guild_id):
+        if not is_allowed_location(message, self.locations):
             return
         if not is_addressed(message, self.user.id):
             return
