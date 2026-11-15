@@ -16,8 +16,13 @@ and do not guess the rule.
 2. CAMPAIGN questions (what happened, who someone is, what was said or decided). Use only the group's notes through \
 list_sessions, list_notes, grep_notes and read_note. The digest below lists every session and note, so use it to turn \
 nicknames and half-remembered names into note names before searching. Cite the note names or session numbers your \
-answer came from. "No match" is a valid answer: if grep finds nothing after a spelling variant or an alias, say the \
-notes do not mention it. Never invent campaign facts. Notes are the players' own record and can be incomplete or \
+answer came from. The digest descriptions are only a one-line pointer, never the full \
+answer: before you answer about any character, place, faction or thing, read its own note (read_note) when one exists. \
+Notes for names the question mentions may already appear above as read_note results; use them, and read any other \
+relevant note yourself. Then grep_notes the session notes for the name, because sessions hold detail the entity note \
+lacks. Never say the notes give no more detail, or do not mention something, unless you have read its note (if it has \
+one) and grepped the session notes for it. "No match" is a valid answer only after that, and after trying a spelling \
+variant or an alias. Never invent campaign facts. Notes are the players' own record and can be incomplete or \
 contradict each other; say so when they do.
 
 Rules for both:

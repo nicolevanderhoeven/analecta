@@ -11,6 +11,8 @@ SESSION_RE = re.compile(r"^(\d{3,})_(\d{8})\s*(.*)\.md$")
 MAX_READ_CHARS = 14000
 MAX_GREP_LINES = 40
 LINE_CLIP = 320
+MAX_ENTITY_NOTES = 5
+MIN_ENTITY_NAME_CHARS = 3
 DIGEST_CHAR_BUDGET = 40000  # roughly 10K tokens
 
 
@@ -195,6 +197,35 @@ class NotesStore:
         if self.root not in full.parents or not full.is_file():
             raise NotesError(f"no such note: {path}")
         return full
+
+    # -- entity matching ---------------------------------------------------------
+    def match_entities(self, question: str, limit: int = MAX_ENTITY_NOTES) -> list[NoteInfo]:
+        """Non-session notes whose file name or frontmatter alias appears in the question as a whole word.
+
+        Case-insensitive. Longer names win, and a name is skipped when it overlaps words already claimed by a
+        longer matched name (so "Old Quill" does not also pull in a note called "Quill"). Results follow the
+        order the names appear in the question.
+        """
+        found: list[tuple[int, NoteInfo]] = []
+        spans: list[tuple[int, int]] = []
+        candidates: list[tuple[str, NoteInfo]] = []
+        for info in self.infos():
+            if info.is_session:
+                continue
+            names = [info.title]
+            aliases = info.meta.get("aliases")
+            names += aliases if isinstance(aliases, list) else ([aliases] if isinstance(aliases, str) else [])
+            candidates += [(n.strip(), info) for n in names if len(n.strip()) >= MIN_ENTITY_NAME_CHARS]
+        for name, info in sorted(candidates, key=lambda c: -len(c[0])):
+            if any(f[1].path == info.path for f in found):
+                continue
+            m = re.search(rf"(?<!\w){re.escape(name)}(?!\w)", question, re.IGNORECASE)
+            if not m or any(m.start() < e and s < m.end() for s, e in spans):
+                continue
+            spans.append((m.start(), m.end()))
+            found.append((m.start(), info))
+        found.sort(key=lambda f: f[0])
+        return [f[1] for f in found[:limit]]
 
     # -- digest ------------------------------------------------------------------
     def digest(self, budget_chars: int = DIGEST_CHAR_BUDGET) -> str:
