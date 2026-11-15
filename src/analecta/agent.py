@@ -7,12 +7,14 @@ from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
 from .aon import AonClient
-from .llm.base import LLMProvider, Message, ModelTurn, ToolSpec, Usage
+from .llm.base import LLMProvider, Message, ModelTurn, ToolCall, ToolSpec, Usage
 from .notes import NotesError, NotesStore
 
 log = logging.getLogger("analecta.agent")
 
 MAX_TOOL_RESULT_CHARS = 12000
+PREREAD_CUT = "\n[truncated; call read_note again with a later start_line]"
+MAX_PREREAD_CHARS = 24000  # total across all notes read up front
 
 TOOLS: list[ToolSpec] = [
     ToolSpec(
@@ -118,10 +120,45 @@ class Agent:
             out = out[:MAX_TOOL_RESULT_CHARS] + "\n[result truncated]"
         return out
 
+    def preread_messages(self, history: list[Message]) -> list[Message]:
+        """Notes named in the latest user question, as already-made read_note calls and their results.
+
+        The model otherwise tends to answer from the one-line digest description and never open the note.
+        """
+        question = next((m.text for m in reversed(history) if m.role == "user"), "")
+        try:
+            infos = self.notes.match_entities(question)
+        except OSError:
+            return []
+        calls: list[ToolCall] = []
+        outputs: list[Message] = []
+        budget = MAX_PREREAD_CHARS
+        for n, info in enumerate(infos, 1):
+            if budget <= 0:
+                break
+            try:
+                out = self.notes.read(info.path, 1, 400)
+            except (NotesError, OSError):
+                continue
+            limit = min(budget, MAX_TOOL_RESULT_CHARS)
+            if len(out) > limit:
+                out = out[: max(0, limit - len(PREREAD_CUT))] + PREREAD_CUT
+            budget -= len(out)
+            call = ToolCall(id=f"preread{n}", name="read_note", arguments={"path": info.path})
+            calls.append(call)
+            outputs.append(Message(role="tool", text=out, tool_call_id=call.id))
+        if not calls:
+            return []
+        return [Message(role="assistant", text="", tool_calls=calls), *outputs]
+
     async def answer(self, history: list[Message]) -> AgentResult:
         started = time.monotonic()
         messages = list(history)
         result = AgentResult(text="")
+        pre = self.preread_messages(history)
+        if pre:
+            messages.extend(pre)
+            result.tools_used.extend("read_note" for _ in pre[0].tool_calls)
         for turn_no in range(1, self.max_turns + 1):
             last = turn_no == self.max_turns
             turn: ModelTurn = await self.provider.step(
