@@ -1,0 +1,29 @@
+# Allowlist: ignore everything, then unignore intended project files.
+*
+!*/
+!.gitignore
+!README.md
+!*.md
+!*.py
+!*.ts
+!*.js
+!*.json
+!*.toml
+!*.yaml
+!*.yml
+!Dockerfile
+!.env.example
+# Never commit secrets, credentials, campaign data or transcripts.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials*.json
+data/
+notes/
+transcripts/
+logs/
+*.log
+node_modules/
+.venv/
