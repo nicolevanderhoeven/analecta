@@ -21,6 +21,8 @@ Not published, endorsed, or specifically approved by Paizo.
 
 - **Plain search, no RAG.** The agent greps and reads the notes. A digest of session one-liners and note
   descriptions (about 10K tokens) sits in the cached system prompt so nicknames and aliases resolve before searching.
+  When a question names a note (by file name or alias), the bot reads that note before answering instead of relying on
+  the digest's short description.
 - **Rules come live from Archives of Nethys** through the site's own search backend, with a link to the exact page,
   a short cache, a low request rate, a back-off on failures and a switch to turn it off (`AON_ENABLED=false`).
 - **One channel, one audience.** The bot answers only in the one configured channel, only when mentioned or replied to,
