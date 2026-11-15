@@ -7,6 +7,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+_COMMENT = re.compile(r"(?:^|\s)#.*$")
 _KEY = re.compile(r"^([A-Za-z0-9_\-]+)\s*:\s*(.*)$")
 
 
@@ -17,7 +18,7 @@ class Entry:
 
     @property
     def value(self) -> str | list[str]:
-        first = self.raw_lines[0].partition(":")[2].strip()
+        first = _COMMENT.sub("", self.raw_lines[0].partition(":")[2]).strip()
         rest = [ln for ln in self.raw_lines[1:] if ln.strip()]
         items = [ln.strip()[2:].strip() for ln in rest if ln.strip().startswith("- ")]
         if items and not first:
@@ -34,6 +35,14 @@ def _unquote(v: str) -> str:
     if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
         return v[1:-1]
     return v
+
+
+def is_unterminated(text: str) -> bool:
+    """True when the text opens a frontmatter block that never closes."""
+    lines = text.split("\n")
+    if lines[0].strip() != "---":
+        return False
+    return not any(ln.strip() in {"---", "..."} for ln in lines[1:])
 
 
 def split(text: str) -> tuple[list[Entry], str]:
@@ -59,7 +68,7 @@ def split(text: str) -> tuple[list[Entry], str]:
 
 
 def as_dict(entries: list[Entry]) -> dict[str, str | list[str]]:
-    return {e.key: e.value for e in entries}
+    return {e.key.lower(): e.value for e in entries}
 
 
 def is_false(value: str | list[str] | None) -> bool:

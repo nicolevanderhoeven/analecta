@@ -117,6 +117,8 @@ def _frontmatter_excludes(entries: list[frontmatter.Entry]) -> str | None:
 def sanitize_note(text: str) -> tuple[str | None, str, int]:
     """Return (clean text or None, reason if excluded, secret sections removed)."""
     text = text.replace("\r\n", "\n").lstrip("﻿")
+    if frontmatter.is_unterminated(text):
+        return None, "unterminated-frontmatter", 0
     entries, body = frontmatter.split(text)
     reason = _frontmatter_excludes(entries)
     if reason:

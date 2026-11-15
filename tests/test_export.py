@@ -140,6 +140,19 @@ def test_bot_false_tag_variants():
         assert clean is None and reason == "bot-false"
 
 
+def test_exclusions_survive_comments_case_and_unterminated_frontmatter():
+    cases = {
+        "---\nmet: false # not yet met\n---\nx": "met-false",
+        "---\nbot: false # private\n---\nx": "bot-false",
+        "---\nMet: false\n---\nx": "met-false",
+        "---\nBOT: No\n---\nx": "bot-false",
+        "---\nmet: false\ntype: npc\nbody never closed": "unterminated-frontmatter",
+    }
+    for text, why in cases.items():
+        clean, reason, _ = ex.sanitize_note(text)
+        assert clean is None and reason == why, text
+
+
 def test_main_dry_run_writes_nothing(tmp_path: Path, capsys):
     out = tmp_path / "out"
     assert ex.main(["--source", str(SOURCE), "--dest", str(out), "--dry-run"]) == 0
