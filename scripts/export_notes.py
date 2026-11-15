@@ -4,7 +4,9 @@
 Reads ONLY the source folder (the campaign notes). Writes ONLY into the export folder.
 Exclusions: notes with `met: false`, notes with `bot: false`, "Secret goals" sections, hidden
 `%% ... %%` blocks (this also removes Excalidraw drawing data), HTML comments, embeds of
-transcripts, and e-mail addresses. Frontmatter is cut down to an allowlist of keys.
+transcripts, and e-mail addresses. Frontmatter is cut down to an allowlist of keys. Exclusion
+keys match case-insensitively and ignore trailing `# comments`; a note whose frontmatter is never
+closed is skipped rather than exported.
 
 Guard: the script refuses to run, and changes nothing, if the export folder holds anything
 that this script did not put there, or if the folder sits in a place where it should not be.
