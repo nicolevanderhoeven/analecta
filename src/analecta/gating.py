@@ -3,22 +3,23 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict
+from collections.abc import Iterable
 from typing import Any
 
 DISCORD_LIMIT = 2000
 
 
-def is_allowed_location(message: Any, *, channel_id: int, guild_id: int | None) -> bool:
-    """Only the one configured channel (or a thread directly under it). No DMs, no other servers."""
+def is_allowed_location(message: Any, locations: Iterable[tuple[int, int]]) -> bool:
+    """Only configured (server, channel) pairs, or a thread directly under one. No DMs, no other servers."""
     guild = getattr(message, "guild", None)
     if guild is None:
         return False  # DMs and group DMs
-    if guild_id is not None and guild.id != guild_id:
-        return False
     channel = message.channel
-    if channel.id == channel_id:
-        return True
-    return getattr(channel, "parent_id", None) == channel_id
+    ids = {channel.id, getattr(channel, "parent_id", None)} - {None}
+    return any(
+        guild.id == guild_id and channel_id in ids
+        for guild_id, channel_id in locations
+    )
 
 
 def is_addressed(message: Any, bot_user_id: int) -> bool:

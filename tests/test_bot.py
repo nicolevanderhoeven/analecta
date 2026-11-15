@@ -10,6 +10,8 @@ from analecta.gating import Limiter
 from analecta.llm.base import Message, ProviderError
 
 BOT_ID, CHANNEL, GUILD = 7, 10, 1
+OTHER_CHANNEL, OTHER_GUILD = 20, 2
+LOCATIONS = [(GUILD, CHANNEL), (OTHER_GUILD, OTHER_CHANNEL)]
 
 
 class FakeAgent:
@@ -32,7 +34,7 @@ class Typing:
 
 
 def make_bot(agent=None, **limits):
-    bot = AnalectaBot(agent=agent or FakeAgent(), channel_id=CHANNEL, guild_id=GUILD,
+    bot = AnalectaBot(agent=agent or FakeAgent(), locations=LOCATIONS,
                       limiter=Limiter(limits.get("cooldown", 0), limits.get("daily", 100)))
     bot._connection.user = NS(id=BOT_ID)
     return bot
@@ -63,13 +65,23 @@ def test_answers_in_channel_when_mentioned():
     assert agent.calls[0][-1].text == "who is Old Quill?"
 
 
+def test_answers_in_second_server_too():
+    agent = FakeAgent()
+    bot = make_bot(agent)
+    assert run(bot, make_msg(channel=OTHER_CHANNEL, guild=OTHER_GUILD)) == ["the answer"]
+    assert len(agent.calls) == 1
+
+
 def test_ignores_everything_else():
     agent = FakeAgent()
     bot = make_bot(agent)
     for msg in (
         make_msg(channel=11),            # other channel
         make_msg(guild=None),            # DM
-        make_msg(guild=2),               # other server
+        make_msg(guild=3),               # unlisted server
+        make_msg(guild=OTHER_GUILD),     # listed server, but this channel belongs to the first one
+        make_msg(channel=OTHER_CHANNEL), # second server's channel id in the first server
+        make_msg(channel=21, guild=OTHER_GUILD),  # other channel in the second server
         make_msg(is_bot=True),           # other bots
         make_msg(mentions=()),           # not addressed
     ):

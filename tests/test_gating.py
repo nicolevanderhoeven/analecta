@@ -15,13 +15,26 @@ def msg(*, guild=1, channel=10, parent=None, mentions=(), reply_to=None):
 
 
 def test_only_configured_channel():
-    assert is_allowed_location(msg(), channel_id=10, guild_id=1)
-    assert not is_allowed_location(msg(channel=11), channel_id=10, guild_id=1)
-    assert not is_allowed_location(msg(guild=None), channel_id=10, guild_id=1)  # DM
-    assert not is_allowed_location(msg(guild=2), channel_id=10, guild_id=1)  # other server
-    assert is_allowed_location(msg(channel=55, parent=10), channel_id=10, guild_id=1)  # thread under it
-    assert not is_allowed_location(msg(channel=55, parent=11), channel_id=10, guild_id=1)
-    assert is_allowed_location(msg(guild=2), channel_id=10, guild_id=None)
+    one = [(1, 10)]
+    assert is_allowed_location(msg(), one)
+    assert not is_allowed_location(msg(channel=11), one)
+    assert not is_allowed_location(msg(guild=None), one)  # DM
+    assert not is_allowed_location(msg(guild=2), one)  # other server
+    assert is_allowed_location(msg(channel=55, parent=10), one)  # thread under it
+    assert not is_allowed_location(msg(channel=55, parent=11), one)
+    assert not is_allowed_location(msg(), [])
+
+
+def test_several_servers():
+    two = [(1, 10), (2, 20)]
+    assert is_allowed_location(msg(guild=1, channel=10), two)
+    assert is_allowed_location(msg(guild=2, channel=20), two)
+    assert is_allowed_location(msg(guild=2, channel=55, parent=20), two)  # thread in the second server
+    assert not is_allowed_location(msg(guild=1, channel=20), two)  # channel belongs to the other server
+    assert not is_allowed_location(msg(guild=2, channel=10), two)
+    assert not is_allowed_location(msg(guild=3, channel=10), two)  # unlisted server
+    assert not is_allowed_location(msg(guild=2, channel=21), two)  # unlisted channel in a listed server
+    assert not is_allowed_location(msg(guild=None, channel=20), two)  # DM
 
 
 def test_addressed_by_mention_or_reply():

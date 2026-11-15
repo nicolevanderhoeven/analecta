@@ -36,11 +36,36 @@ def _float(env: dict[str, str], key: str, default: float) -> float:
         raise ConfigError(f"{key} must be a number") from exc
 
 
+# One allowed place: (server id, channel id).
+Location = tuple[int, int]
+
+
+def _snowflake(text: str, what: str) -> int:
+    text = text.strip()
+    if not text.isdigit() or int(text) <= 0:
+        raise ConfigError(f"{what} must be a positive whole number, got {text!r}")
+    return int(text)
+
+
+def parse_channels(raw: str) -> list[Location]:
+    """Parse DISCORD_CHANNELS: comma-separated `server_id:channel_id` pairs."""
+    pairs: list[Location] = []
+    for entry in raw.split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        guild_text, sep, channel_text = entry.partition(":")
+        if not sep or ":" in channel_text:
+            raise ConfigError(f"DISCORD_CHANNELS entry {entry!r} must look like server_id:channel_id")
+        pairs.append((_snowflake(guild_text, "DISCORD_CHANNELS server id"),
+                      _snowflake(channel_text, "DISCORD_CHANNELS channel id")))
+    return pairs
+
+
 @dataclass(frozen=True)
 class Settings:
     discord_token: str
-    channel_id: int
-    guild_id: int | None
+    channels: tuple[Location, ...]
     provider: str
     model: str
     api_key: str
@@ -81,25 +106,35 @@ def load_settings(env: dict[str, str] | None = None, *, need_discord: bool = Tru
 
     provider = env.get("LLM_PROVIDER", "openai").strip().lower()
     token = need("DISCORD_TOKEN") if need_discord else env.get("DISCORD_TOKEN", "")
-    channel = need("DISCORD_CHANNEL_ID") if need_discord else env.get("DISCORD_CHANNEL_ID", "0")
+    channels_raw = env.get("DISCORD_CHANNELS", "").strip()
+    if channels_raw.startswith("replace-with"):
+        channels_raw = ""
+    channel = env.get("DISCORD_CHANNEL_ID", "").strip()
+    if channel.startswith("replace-with"):
+        channel = ""
+    guild_raw = env.get("DISCORD_GUILD_ID", "").strip()
+    if guild_raw.startswith("replace-with"):
+        guild_raw = ""
+    if need_discord and not channels_raw and not channel:
+        missing.append("DISCORD_CHANNELS (or DISCORD_GUILD_ID and DISCORD_CHANNEL_ID)")
     api_key = need("OPENAI_API_KEY") if provider == "openai" else env.get("LLM_API_KEY", "")
     notes = need("NOTES_DIR")
     if missing:
         raise ConfigError("Missing required settings: " + ", ".join(sorted(set(missing))))
 
-    guild_raw = env.get("DISCORD_GUILD_ID", "").strip()
-    guild = None
-    if guild_raw and not guild_raw.startswith("replace-with"):
-        guild = _int(env, "DISCORD_GUILD_ID", 0) or None
-    try:
-        channel_id = int(channel) if channel else 0
-    except ValueError as exc:
-        raise ConfigError("DISCORD_CHANNEL_ID must be a number") from exc
+    channels = parse_channels(channels_raw) if need_discord else []
+    if channel and need_discord:
+        if not guild_raw:
+            raise ConfigError("DISCORD_CHANNEL_ID needs DISCORD_GUILD_ID: every channel must be paired with its server")
+        pair = (_snowflake(guild_raw, "DISCORD_GUILD_ID"), _snowflake(channel, "DISCORD_CHANNEL_ID"))
+        if pair not in channels:
+            channels.append(pair)
+    if len(set(channels)) != len(channels):
+        raise ConfigError("DISCORD_CHANNELS lists the same server and channel more than once")
 
     return Settings(
         discord_token=token,
-        channel_id=channel_id,
-        guild_id=guild,
+        channels=tuple(channels),
         provider=provider,
         model=env.get("LLM_MODEL", "gpt-6-luna").strip(),
         api_key=api_key,

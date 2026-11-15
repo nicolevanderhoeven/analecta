@@ -55,7 +55,7 @@ into a terminal where they are echoed or logged. For the OpenAI key held in a lo
   printf 'OPENAI_API_KEY=%s\n' "$OPENAI_API_KEY" | ssh root@<DROPLET_ADDRESS> 'umask 077; cat >> /etc/analecta/analecta.env' )
 ```
 
-Add the remaining lines (channel ID, server ID, model, `NOTES_DIR=/srv/analecta/notes`, the Discord token the same way)
+Add the remaining lines (`DISCORD_CHANNELS` with the server and channel IDs, model, `NOTES_DIR=/srv/analecta/notes`, the Discord token the same way)
 and then `chown root:analecta /etc/analecta/analecta.env && chmod 640 /etc/analecta/analecta.env`.
 
 ## 3. Syncthing
@@ -90,8 +90,32 @@ folder; Syncthing deletes it on the server and keeps a copy in `.stversions`. Pu
 2. Create a **private** channel for the group. Give the bot role only: View Channel, Send Messages, Read Message
    History. Invite the bot with scopes `bot` and no extra permissions. Anyone who can post in the channel may use
    it; channel permissions are the access control.
-3. Put the channel's ID and the server's ID in the env file (Discord Developer Mode, Copy ID).
+3. Put the server and channel IDs in the env file as `DISCORD_CHANNELS=<SERVER_ID>:<CHANNEL_ID>` (Discord Developer
+   Mode, Copy ID). The older `DISCORD_GUILD_ID` plus `DISCORD_CHANNEL_ID` pair still works as one entry; `DISCORD_CHANNEL_ID` without
+   `DISCORD_GUILD_ID` stops the bot at start.
 4. Post the text from [pinned-note.md](pinned-note.md) in the channel and pin it. Tell the group before launch.
+
+### Adding another server
+
+The bot can answer in several servers at once, one channel per server pair. Repeat for each new server:
+
+1. **Invite.** Someone with Manage Server permission on the new server opens the bot's invite link (scope `bot`, no
+   extra permissions). If that person is not the application's owner, the application must allow it: Developer
+   Portal, your application, Installation (or Bot) and turn on **Public Bot**, so other accounts can add it. Turn
+   Public Bot off again afterwards if you want to stop strangers from inviting it. Until the bot has an allowed
+   channel in a server it ignores that server entirely.
+2. **Channel permissions.** In the new server, create a private channel and give the bot role only: View Channel,
+   Send Messages, Read Message History (and Send Messages in Threads if threads are used). Channel permissions stay
+   the access control.
+3. **Settings.** Copy the new server's ID and the channel's ID and append the pair to the env file on the droplet,
+   comma-separated, for example:
+   `DISCORD_CHANNELS=<SERVER_ID_1>:<CHANNEL_ID_1>,<SERVER_ID_2>:<CHANNEL_ID_2>`.
+   A channel must be paired with its own server; a malformed entry stops the bot at start with a clear error.
+   If the old `DISCORD_GUILD_ID` and `DISCORD_CHANNEL_ID` lines are still there they count as one more pair.
+4. `systemctl restart analecta`, then post the text from [pinned-note.md](pinned-note.md) in the new channel and pin
+   it. Check that `@Analecta help` answers there and that other channels in both servers and DMs get no reply.
+
+Keep real IDs in the env file only, never in this repository.
 
 ## 5. Go live
 

@@ -57,7 +57,6 @@ async def run(args: argparse.Namespace) -> int:
     load_env_file(os.environ.get("ANALECTA_ENV_FILE", ".env"))
     env = dict(os.environ)
     env.setdefault("DISCORD_TOKEN", "unused")
-    env.setdefault("DISCORD_CHANNEL_ID", "0")
     if args.model:
         env["LLM_MODEL"] = args.model
     settings = load_settings(env, need_discord=False)

@@ -5,7 +5,7 @@
 | What | How |
 |---|---|
 | Stop rules lookups (if the Archives of Nethys endpoint changes) | Set `AON_ENABLED=false` in `/etc/analecta/analecta.env`, then `systemctl restart analecta`. The bot says lookups are off and does not guess rules. |
-| Stop the bot | `systemctl stop analecta`, or remove its channel permission in Discord. |
+| Stop the bot | `systemctl stop analecta`, or remove its channel permission in Discord. To drop one server, delete its pair from `DISCORD_CHANNELS` and restart, or kick the bot from that server. |
 | Change the model | Set `LLM_MODEL` (and `LLM_PROVIDER` once another provider is added), then restart. |
 | Daily and per-person limits | `DAILY_QUESTION_LIMIT`, `USER_COOLDOWN_SECONDS`. |
 
