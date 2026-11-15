@@ -22,7 +22,6 @@ def test_only_configured_channel():
     assert not is_allowed_location(msg(guild=2), one)  # other server
     assert is_allowed_location(msg(channel=55, parent=10), one)  # thread under it
     assert not is_allowed_location(msg(channel=55, parent=11), one)
-    assert is_allowed_location(msg(guild=2), [(None, 10)])  # no server guard
     assert not is_allowed_location(msg(), [])
 
 

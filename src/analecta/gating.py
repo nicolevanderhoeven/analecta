@@ -9,18 +9,15 @@ from typing import Any
 DISCORD_LIMIT = 2000
 
 
-def is_allowed_location(message: Any, locations: Iterable[tuple[int | None, int]]) -> bool:
-    """Only configured (server, channel) pairs, or a thread directly under one. No DMs, no other servers.
-
-    A server of None means "any server" (the original single-channel setting without a server id).
-    """
+def is_allowed_location(message: Any, locations: Iterable[tuple[int, int]]) -> bool:
+    """Only configured (server, channel) pairs, or a thread directly under one. No DMs, no other servers."""
     guild = getattr(message, "guild", None)
     if guild is None:
         return False  # DMs and group DMs
     channel = message.channel
     ids = {channel.id, getattr(channel, "parent_id", None)} - {None}
     return any(
-        (guild_id is None or guild.id == guild_id) and channel_id in ids
+        guild.id == guild_id and channel_id in ids
         for guild_id, channel_id in locations
     )
 

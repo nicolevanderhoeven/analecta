@@ -20,7 +20,7 @@ HELP_WORDS = {"help", "about", "?", "what can you see", "what do you see"}
 
 
 class AnalectaBot(discord.Client):
-    def __init__(self, *, agent: Agent, locations: Iterable[tuple[int | None, int]], limiter: Limiter):
+    def __init__(self, *, agent: Agent, locations: Iterable[tuple[int, int]], limiter: Limiter):
         intents = discord.Intents.none()
         intents.guilds = True
         intents.guild_messages = True

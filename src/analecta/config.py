@@ -4,7 +4,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 
 class ConfigError(RuntimeError):
@@ -37,8 +36,8 @@ def _float(env: dict[str, str], key: str, default: float) -> float:
         raise ConfigError(f"{key} must be a number") from exc
 
 
-# One allowed place: (server id or None for "any server", channel id).
-Location = tuple[Optional[int], int]
+# One allowed place: (server id, channel id).
+Location = tuple[int, int]
 
 
 def _snowflake(text: str, what: str) -> int:
@@ -113,21 +112,21 @@ def load_settings(env: dict[str, str] | None = None, *, need_discord: bool = Tru
     channel = env.get("DISCORD_CHANNEL_ID", "").strip()
     if channel.startswith("replace-with"):
         channel = ""
+    guild_raw = env.get("DISCORD_GUILD_ID", "").strip()
+    if guild_raw.startswith("replace-with"):
+        guild_raw = ""
     if need_discord and not channels_raw and not channel:
-        missing.append("DISCORD_CHANNELS (or DISCORD_CHANNEL_ID)")
+        missing.append("DISCORD_CHANNELS (or DISCORD_GUILD_ID and DISCORD_CHANNEL_ID)")
     api_key = need("OPENAI_API_KEY") if provider == "openai" else env.get("LLM_API_KEY", "")
     notes = need("NOTES_DIR")
     if missing:
         raise ConfigError("Missing required settings: " + ", ".join(sorted(set(missing))))
 
     channels = parse_channels(channels_raw) if need_discord else []
-    guild_raw = env.get("DISCORD_GUILD_ID", "").strip()
-    if guild_raw.startswith("replace-with"):
-        guild_raw = ""
     if channel and need_discord:
-        # Original single-pair form: the server is an optional extra guard.
-        pair = (_snowflake(guild_raw, "DISCORD_GUILD_ID") if guild_raw else None,
-                _snowflake(channel, "DISCORD_CHANNEL_ID"))
+        if not guild_raw:
+            raise ConfigError("DISCORD_CHANNEL_ID needs DISCORD_GUILD_ID: every channel must be paired with its server")
+        pair = (_snowflake(guild_raw, "DISCORD_GUILD_ID"), _snowflake(channel, "DISCORD_CHANNEL_ID"))
         if pair not in channels:
             channels.append(pair)
     if len(set(channels)) != len(channels):

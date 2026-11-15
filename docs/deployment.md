@@ -91,7 +91,8 @@ folder; Syncthing deletes it on the server and keeps a copy in `.stversions`. Pu
    History. Invite the bot with scopes `bot` and no extra permissions. Anyone who can post in the channel may use
    it; channel permissions are the access control.
 3. Put the server and channel IDs in the env file as `DISCORD_CHANNELS=<SERVER_ID>:<CHANNEL_ID>` (Discord Developer
-   Mode, Copy ID). The older `DISCORD_CHANNEL_ID` plus `DISCORD_GUILD_ID` pair still works as one entry.
+   Mode, Copy ID). The older `DISCORD_GUILD_ID` plus `DISCORD_CHANNEL_ID` pair still works as one entry; `DISCORD_CHANNEL_ID` without
+   `DISCORD_GUILD_ID` stops the bot at start.
 4. Post the text from [pinned-note.md](pinned-note.md) in the channel and pin it. Tell the group before launch.
 
 ### Adding another server
@@ -110,7 +111,7 @@ The bot can answer in several servers at once, one channel per server pair. Repe
    comma-separated, for example:
    `DISCORD_CHANNELS=<SERVER_ID_1>:<CHANNEL_ID_1>,<SERVER_ID_2>:<CHANNEL_ID_2>`.
    A channel must be paired with its own server; a malformed entry stops the bot at start with a clear error.
-   If the old `DISCORD_CHANNEL_ID` and `DISCORD_GUILD_ID` lines are still there they count as one more pair.
+   If the old `DISCORD_GUILD_ID` and `DISCORD_CHANNEL_ID` lines are still there they count as one more pair.
 4. `systemctl restart analecta`, then post the text from [pinned-note.md](pinned-note.md) in the new channel and pin
    it. Check that `@Analecta help` answers there and that other channels in both servers and DMs get no reply.
 
