@@ -71,8 +71,11 @@ syncthing cli config folders list     # every folder id; for each, `syncthing cl
    `analecta-notes` folder receive-only with simple versioning (keep 5), turns off discovery, relays and NAT
    traversal, removes the default folder, and prints `<DROPLET_DEVICE_ID>`.
 2. On the Mac, add the droplet as a device with address `tcp://<DROPLET_ADDRESS>:22000` (the Mac dials the droplet;
-   the droplet never dials out) and add one folder: path `~/Analecta-export`, type **Send Only**, shared with that
-   device only. Never share the vault or any other folder.
+   the droplet never dials out) and add one folder with id `analecta-notes`: path `~/Analecta-export`, type
+   **Send Only**, shared with that device only. Never share the vault or any other folder. Syncthing's "default
+   folder" setting can pre-share every new folder with other devices (check `syncthing cli config defaults folder
+   dump-json`, field `devices`); after adding the folder, confirm with `syncthing cli config folders analecta-notes
+   dump-json` that its devices are only the Mac and the droplet, and remove any other.
 3. Accept the Mac's folder offer on the droplet if Syncthing asks, and check that `ls /srv/analecta/notes` fills in.
    The Mac's `.stignore` keeps temporary files out.
 

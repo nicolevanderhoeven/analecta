@@ -231,7 +231,7 @@ def run_export(source: Path, dest: Path, *, dry_run: bool = False) -> Report:
         return report
 
     dest.mkdir(parents=True, exist_ok=True)
-    (dest / ".stignore").write_text(f"{TMP_PREFIX}*\n", encoding="utf-8")
+    (dest / ".stignore").write_text(f"{TMP_PREFIX}*\n{MANIFEST}\n", encoding="utf-8")
     for rel, clean in outputs.items():
         target = dest / rel
         target.parent.mkdir(parents=True, exist_ok=True)

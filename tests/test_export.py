@@ -51,7 +51,8 @@ def test_frontmatter_list_aliases_kept(exported: Path):
 def test_manifest_and_stignore(exported: Path):
     manifest = json.loads((exported / ex.MANIFEST).read_text())
     assert "Marta Quillon.md" in manifest["files"]
-    assert (exported / ".stignore").read_text().startswith(ex.TMP_PREFIX)
+    ignore = (exported / ".stignore").read_text()
+    assert ex.TMP_PREFIX in ignore and ex.MANIFEST in ignore  # neither is synced to the server
     assert not list(exported.glob(f"{ex.TMP_PREFIX}*"))
 
 

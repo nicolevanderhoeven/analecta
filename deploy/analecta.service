@@ -13,6 +13,7 @@ EnvironmentFile=/etc/analecta/analecta.env
 ExecStart=/opt/analecta/.venv/bin/python -m analecta
 Restart=on-failure
 RestartSec=10
+RestartPreventExitStatus=2
 
 # Hardening: the bot needs outbound network and read access to the notes, nothing else.
 NoNewPrivileges=true
