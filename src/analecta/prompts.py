@@ -1,7 +1,7 @@
 """The system prompt and the help text. The clearance results go in here and in docs/clearances.md."""
 from __future__ import annotations
 
-from .clearances import HELP_NOTICE
+from .clearances import help_notice
 
 SYSTEM_TEMPLATE = """\
 You are Analecta, a helper bot for a Pathfinder 2e gaming group on Discord. You answer two kinds of questions.
@@ -44,5 +44,5 @@ Digest of the campaign notes (names, aliases, one-line descriptions):
 """
 
 
-def build_system_prompt(digest: str) -> str:
-    return SYSTEM_TEMPLATE.format(help=" ".join(HELP_NOTICE.split()), digest=digest)
+def build_system_prompt(digest: str, owner: str = "") -> str:
+    return SYSTEM_TEMPLATE.format(help=" ".join(help_notice(owner).split()), digest=digest)

@@ -1,9 +1,9 @@
 # Pinned note and help text
 
 This is the text Analecta posts for `@Analecta help` and the text to pin in the channel. It is generated from
-`src/analecta/clearances.py` (print it with `python -m analecta pinned`); a test keeps this file in sync. The
-clearance behind each statement is in [clearances.md](clearances.md). Before launch, post it and pin it, and tell the
-group.
+`src/analecta/clearances.py` (print it with `python -m analecta pinned`); a test keeps this file in sync. This is the version with no owner name; if `BOT_OWNER` is set, the bot also
+says who runs it, so print the note after setting it and pin that. The clearance behind each statement is in
+[clearances.md](clearances.md). Before launch, post it and pin it, and tell the group.
 
 ---
 

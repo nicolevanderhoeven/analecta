@@ -8,7 +8,7 @@ from collections.abc import Iterable
 import discord
 
 from .agent import Agent
-from .clearances import PINNED_NOTE
+from .clearances import pinned_note
 from .corrections import (CORRECT, MAX_CORRECTION_CHARS, WRONG, CorrectionStore, classify_reply, is_thumbs_down,
                           scrub)
 from .gating import Limiter, is_addressed, is_allowed_location, split_message, strip_mention
@@ -29,7 +29,7 @@ _NOT_ANSWERS = frozenset({CORRECT_USAGE, SAVED_CORRECTION, LOGGED_MISREAD, SAVE_
 
 class AnalectaBot(discord.Client):
     def __init__(self, *, agent: Agent, locations: Iterable[tuple[int, int]], limiter: Limiter,
-                 corrections: CorrectionStore | None = None):
+                 corrections: CorrectionStore | None = None, owner: str = ""):
         intents = discord.Intents.none()
         intents.guilds = True
         intents.guild_messages = True
@@ -40,6 +40,7 @@ class AnalectaBot(discord.Client):
         self.locations = tuple(locations)
         self.limiter = limiter
         self.corrections = corrections
+        self.owner = owner
         self._slots = asyncio.Semaphore(2)
 
     async def on_ready(self) -> None:
@@ -56,7 +57,7 @@ class AnalectaBot(discord.Client):
         if not is_addressed(message, self.user.id):
             return
         if not question or question.lower().strip(" ?!.") in HELP_WORDS:
-            for part in split_message(PINNED_NOTE):
+            for part in split_message(pinned_note(self.owner)):
                 await message.reply(part, mention_author=False)
             return
         if len(question) > MAX_QUESTION_CHARS:
