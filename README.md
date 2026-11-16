@@ -6,6 +6,10 @@ Markdown notes.
 
 Not published, endorsed, or specifically approved by Paizo.
 
+> **Want your own copy?** Start with the **[set-up-from-scratch guide](docs/setup-from-scratch.md)**. It says up front
+> what this is for (Pathfinder 2e only, OpenAI only, notes exported from a Mac to a DigitalOcean droplet, and what it
+> costs to run) and walks through the server, the Discord application, Syncthing and the notes format.
+
 ## How it works
 
 ```
@@ -53,6 +57,8 @@ address, real names and the real notes never enter it.
 
 ## Documentation
 
+- [docs/setup-from-scratch.md](docs/setup-from-scratch.md): the start-to-finish guide for a new owner: scope and cost,
+  notes format, Syncthing on the Mac, creating the droplet and the Discord application.
 - [docs/deployment.md](docs/deployment.md): droplet, Syncthing (notes out, corrections back), Mac export job, Discord setup, go-live checklist.
 - [docs/clearances.md](docs/clearances.md): Discord, OpenAI and ORC checks, with sources.
 - [docs/pinned-note.md](docs/pinned-note.md): the help text and the pinned note.
@@ -72,5 +78,8 @@ Run the bot locally with a `.env` copied from `.env.example` (`python -m analect
 
 ## Licence
 
-No licence has been chosen for the code yet. Pathfinder rules content is Paizo's and is shown via Archives of
-Nethys (see [docs/clearances.md](docs/clearances.md)).
+The code is licensed under the [GNU Affero General Public License v3.0](LICENSE) (`AGPL-3.0-only`). If you modify it
+and let others interact with it over a network, the licence asks you to offer them your version's source.
+
+Pathfinder rules content is Paizo's, not covered by this licence, and is shown via Archives of Nethys (see
+[docs/clearances.md](docs/clearances.md)).
