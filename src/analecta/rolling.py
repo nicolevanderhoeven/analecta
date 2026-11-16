@@ -8,6 +8,7 @@ import re
 from dataclasses import dataclass
 
 from . import dice, pf2e
+from .pf2e import escape
 from .sheets import SheetError, SheetInfo, SheetStore
 
 _TRAILING_MOD = re.compile(r"^(?P<stat>.*?)\s*(?P<mod>[+-]\s*\d+)\s*$")
@@ -20,12 +21,6 @@ class RollOutcome:
     kind: str                      # "dice" or "sheet"
     total: int
     character: str = ""
-
-
-def escape(text: str) -> str:
-    """Neutralise markdown and mentions in free text that came from a sheet or a member."""
-    out = re.sub(r"([\\*_`~|>\[\]()#])", r"\\\1", text)
-    return out.replace("@", "@​")
 
 
 def split_stat_and_modifier(what: str) -> tuple[str, int]:

@@ -89,3 +89,12 @@ def test_summary_is_readable_and_stays_short(build):
 def test_stat_names_include_lores(build):
     names = pf2e.stat_names(build)
     assert "Religion" in names and "Dwarven Lore" in names and "Guild Lore" in names and "Will" in names
+
+
+def test_summary_escapes_markdown_and_mentions_from_every_sheet_field(build):
+    build.update(name="**Bold** @everyone", ancestry="_Elf_", heritage="[x](http://e)", **{"class": "`Cleric`"},
+                 background="~~Bg~~", deity="#Deity", feats=[["**Feat** <@1>", None]], lores=[["Dark*Lore", 2]])
+    text = pf2e.summary(build)
+    for raw in ("**Bold**", "@everyone", "_Elf_", "[x](http://e)", "`Cleric`", "~~Bg~~", "**Feat**", "Dark*Lore"):
+        assert raw not in text
+    assert "\\*\\*Bold\\*\\*" in text and "Dark\\*Lore" in text and "Deity: \\#Deity" in text

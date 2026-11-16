@@ -144,7 +144,7 @@ class SheetStore:
     def get(self, name: str) -> SheetInfo:
         info = self.find(name)
         if info is None:
-            raise SheetError(f"I have no saved character called {clean_name(name) or 'that'}. `/character list` shows who I know.")
+            raise SheetError(f"I have no saved character called {pf2e.escape(clean_name(name)) or 'that'}. `/character list` shows who I know.")
         return info
 
     def _versions(self, info: SheetInfo) -> list[Path]:
@@ -177,14 +177,14 @@ class SheetStore:
 
     def _require_manage(self, actor_id: int, info: SheetInfo, what: str) -> None:
         if not self.can_manage(actor_id, info):
-            raise SheetError(f"Only {info.name}'s owner or a GM can {what}.")
+            raise SheetError(f"Only {pf2e.escape(info.name)}'s owner or a GM can {what}.")
 
     # -- writing sheets --------------------------------------------------------------------------------------
     def add(self, actor_id: int, raw: bytes) -> AddResult:
         name, data = parse_sheet(raw)
         existing = self.find(name)
         if existing is not None and not self.can_manage(actor_id, existing):
-            raise SheetError(f"A character called {name} is already saved and belongs to someone else. "
+            raise SheetError(f"A character called {pf2e.escape(name)} is already saved and belongs to someone else. "
                              "Ask its owner or a GM to update it, or use a different character name.")
         stamp = _now()
         if existing is None:
@@ -276,8 +276,8 @@ class SheetStore:
         if target != actor_id or holders:
             if not self.can_manage(actor_id, info):
                 if target != actor_id:
-                    raise SheetError(f"Only {info.name}'s owner or a GM can register someone else to them.")
-                raise SheetError(f"{info.name} is already registered to someone else. Ask the owner or a GM to change it.")
+                    raise SheetError(f"Only {pf2e.escape(info.name)}'s owner or a GM can register someone else to them.")
+                raise SheetError(f"{pf2e.escape(info.name)} is already registered to someone else. Ask the owner or a GM to change it.")
         self._set_registration(target, info.id)
         return info, target
 

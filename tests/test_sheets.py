@@ -189,3 +189,13 @@ def test_empty_store_and_missing_folder_are_fine(tmp_path):
     store = SheetStore(tmp_path / "does" / "not" / "exist")
     assert store.list() == [] and store.registrations() == [] and store.character_for(1) is None
     assert store.find("") is None
+
+
+def test_error_messages_escape_character_names(store):
+    store.add(ALEX, sheet_bytes("**Bold** @everyone"))
+    with pytest.raises(SheetError) as err:
+        store.add(BLAIR, sheet_bytes("**Bold** @everyone"))
+    assert "**Bold**" not in str(err.value) and "@everyone" not in str(err.value)
+    with pytest.raises(SheetError) as err:
+        store.get("_nobody_ @here")
+    assert "@here" not in str(err.value) and "_nobody_" not in str(err.value)

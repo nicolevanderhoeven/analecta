@@ -27,6 +27,12 @@ RANK_NAMES = {0: "untrained", 2: "trained", 4: "expert", 6: "master", 8: "legend
 _RANK_STEPS = (0, 2, 4, 6, 8)
 
 
+def escape(text: str) -> str:
+    """Neutralise markdown and mentions in free text that came from a sheet or a member."""
+    out = re.sub(r"([\\*_`~|>\[\]()#])", r"\\\1", text)
+    return out.replace("@", "@\u200b")
+
+
 def as_int(value: Any, default: int = 0) -> int:
     if isinstance(value, bool):
         return default
@@ -160,12 +166,12 @@ def hit_points(build: dict) -> int:
 
 def summary(build: dict) -> str:
     """A readable sheet summary (plain markdown, no mentions)."""
-    name = _text(build.get("name")) or "Unnamed"
-    ident = " ".join(p for p in (f"Level {level(build)}", _text(build.get("ancestry")), _text(build.get("heritage")),
-                                 _text(build.get("class"))) if p)
+    name = escape(_text(build.get("name")) or "Unnamed")
+    ident = " ".join(p for p in (f"Level {level(build)}", escape(_text(build.get("ancestry"))), escape(_text(build.get("heritage"))),
+                                 escape(_text(build.get("class")))) if p)
     lines = [f"**{name}** — {ident}"]
-    background = _text(build.get("background"))
-    deity = _text(build.get("deity"))
+    background = escape(_text(build.get("background")))
+    deity = escape(_text(build.get("deity")))
     extra = [p for p in (f"Background: {background}" if background else "", f"Deity: {deity}" if deity and deity.lower() != "not set" else "") if p]
     if extra:
         lines.append(" · ".join(extra))
@@ -180,9 +186,9 @@ def summary(build: dict) -> str:
         lines.append("Skills: " + ", ".join(f"{c.label} {c.total:+d}" for c in trained))
     lore_checks = [c for c in (resolve(build, n) for n, _ in lores(build)) if c]
     if lore_checks:
-        lines.append("Lores: " + ", ".join(f"{c.label} {c.total:+d}" for c in lore_checks))
+        lines.append("Lores: " + ", ".join(f"{escape(c.label)} {c.total:+d}" for c in lore_checks))
     feats = [_text(row[0]) for row in build.get("feats", []) if isinstance(row, (list, tuple)) and row and isinstance(row[0], str)] if isinstance(build.get("feats"), list) else []
     if feats:
-        lines.append("Feats: " + ", ".join(f for f in feats if f))
+        lines.append("Feats: " + ", ".join(escape(f) for f in feats if f))
     lines.append("_Totals are worked out from the saved sheet; conditions, armour check penalties and temporary bonuses are not included._")
     return "\n".join(lines)
