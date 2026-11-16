@@ -27,6 +27,16 @@ Not published, endorsed, or specifically approved by Paizo.
   descriptions (about 10K tokens) sits in the cached system prompt so nicknames and aliases resolve before searching.
   When a question names a note (by file name or alias), the bot reads that note before answering instead of relying on
   the digest's short description.
+- **Relationship questions follow links.** For questions about people ("who is my family", "who are Mira's allies"),
+  the bot also reads the notes the named notes link to with `[[wikilinks]]`, breadth first: two steps by default, three
+  at most, within a budget of 12 notes and about 32K tokens, nearest notes first. It follows person notes (frontmatter
+  `type` of `pc`, `npc`, `character`...) and links on lines about family, partners, allies or enemies; it skips
+  session, place, item and faction notes unless the question names them, stops when a step finds nothing new, and
+  ends such answers with a "Notes read" line. Tune it with `LINK_DEPTH`, `LINK_NOTE_BUDGET` and `LINK_TOKEN_CAP`
+  (see [docs/operations.md](docs/operations.md)).
+- **It knows which character is asking.** If the asker's server nickname or display name equals a player character
+  note's name or alias (type `pc`, case-insensitive), "my", "me" and "I" mean that character; otherwise it asks which.
+  `ANALECTA_CHARACTER_MAP` maps Discord user IDs to character notes for members whose names do not match.
 - **Rules come live from Archives of Nethys** through the site's own search backend, with a link to the exact page,
   a short cache, a low request rate, a back-off on failures and a switch to turn it off (`AON_ENABLED=false`).
 - **The group can correct it.** Reply to an answer with `/correct <the fix>` and it is saved as a *table correction*

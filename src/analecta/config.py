@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from .notes import MAX_LINK_DEPTH, LinkPolicy
 
 
 class ConfigError(RuntimeError):
@@ -62,6 +64,20 @@ def parse_channels(raw: str) -> list[Location]:
     return pairs
 
 
+def parse_character_map(raw: str) -> dict[int, str]:
+    """Parse ANALECTA_CHARACTER_MAP: comma-separated `discord_user_id:Character note name` pairs."""
+    out: dict[int, str] = {}
+    for entry in raw.split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        user_text, sep, name = entry.partition(":")
+        if not sep or not name.strip():
+            raise ConfigError(f"ANALECTA_CHARACTER_MAP entry {entry!r} must look like discord_user_id:Character Name")
+        out[_snowflake(user_text, "ANALECTA_CHARACTER_MAP user id")] = name.strip()
+    return out
+
+
 @dataclass(frozen=True)
 class Settings:
     discord_token: str
@@ -80,6 +96,8 @@ class Settings:
     user_cooldown: float
     daily_limit: int
     bot_owner: str = ""
+    links: LinkPolicy = LinkPolicy()
+    character_map: dict[int, str] = field(default_factory=dict)
 
 
 DEFAULT_CORRECTIONS_DIR = "/srv/analecta/corrections"
@@ -164,4 +182,10 @@ def load_settings(env: dict[str, str] | None = None, *, need_discord: bool = Tru
         user_cooldown=_float(env, "USER_COOLDOWN_SECONDS", 20.0),
         daily_limit=_int(env, "DAILY_QUESTION_LIMIT", 150),
         bot_owner=env.get("BOT_OWNER", "").strip(),
+        links=LinkPolicy(
+            depth=max(0, min(_int(env, "LINK_DEPTH", 2), MAX_LINK_DEPTH)),
+            max_notes=max(1, _int(env, "LINK_NOTE_BUDGET", 12)),
+            token_cap=max(1000, _int(env, "LINK_TOKEN_CAP", 32000)),
+        ),
+        character_map=parse_character_map(env.get("ANALECTA_CHARACTER_MAP", "")),
     )

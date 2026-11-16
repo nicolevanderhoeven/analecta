@@ -9,7 +9,7 @@ from typing import Any, Awaitable, Callable
 from .aon import AonClient
 from .corrections import CorrectionStore
 from .llm.base import LLMProvider, Message, ModelTurn, ToolCall, ToolSpec, Usage
-from .notes import NotesError, NotesStore
+from .notes import FIRST_PERSON_RE, OWNERSHIP_RE, QUESTION_PEOPLE_RE, LinkPolicy, NoteInfo, NotesError, NotesStore
 
 log = logging.getLogger("analecta.agent")
 
@@ -62,6 +62,13 @@ TOOLS: list[ToolSpec] = [
 ]
 
 
+@dataclass(frozen=True)
+class Asker:
+    """Who is asking: their Discord id and the names they appear under (server nickname, display name...)."""
+    user_id: int | None = None
+    names: tuple[str, ...] = ()
+
+
 @dataclass
 class AgentResult:
     text: str
@@ -75,11 +82,14 @@ class AgentResult:
 class Agent:
     def __init__(self, provider: LLMProvider, notes: NotesStore, aon: AonClient,
                  system_builder: Callable[[str], str], max_turns: int = 8,
-                 corrections: CorrectionStore | None = None):
+                 corrections: CorrectionStore | None = None, links: LinkPolicy | None = None,
+                 character_map: dict[int, str] | None = None):
         self.provider = provider
         self.notes = notes
         self.corrections = corrections
         self.aon = aon
+        self.links = links if links is not None else LinkPolicy()
+        self.character_map = dict(character_map or {})
         self.max_turns = max_turns
         self._system_builder = system_builder
         self._system = ""
@@ -123,7 +133,17 @@ class Agent:
             out = out[:MAX_TOOL_RESULT_CHARS] + "\n[result truncated]"
         return out
 
-    def preread_messages(self, history: list[Message]) -> list[Message]:
+    def asker_character(self, asker: Asker | None) -> NoteInfo | None:
+        if asker is None:
+            return None
+        override = self.character_map.get(asker.user_id, "") if asker.user_id is not None else ""
+        try:
+            return self.notes.find_character(list(asker.names), override)
+        except OSError:
+            return None
+
+    def preread_messages(self, history: list[Message], asker: Asker | None = None,
+                         read_paths: list[str] | None = None) -> list[Message]:
         """Already-made tool calls and results placed before the model's first turn.
 
         First the group's table corrections that bear on the conversation (they take precedence over the notes, so
@@ -143,7 +163,17 @@ class Agent:
             infos = self.notes.match_entities(question)
         except OSError:
             infos = []
+        character = self.asker_character(asker)
+        if character is not None:
+            call = ToolCall(id="asker1", name="asker_character", arguments={})
+            calls.append(call)
+            outputs.append(Message(role="tool", tool_call_id=call.id, text=(
+                f"The person asking plays the player character {character.title} (note {character.path}). When they "
+                f"say my, me or I, they mean {character.title}, unless they name someone else.")))
+            if (OWNERSHIP_RE.search(question) or (not infos and FIRST_PERSON_RE.search(question))) and all(i.path != character.path for i in infos):
+                infos.insert(0, character)
         budget = MAX_PREREAD_CHARS
+        seeds: list[NoteInfo] = []
         for n, info in enumerate(infos, 1):
             if budget <= 0:
                 break
@@ -155,18 +185,61 @@ class Agent:
             if len(out) > limit:
                 out = out[: max(0, limit - len(PREREAD_CUT))] + PREREAD_CUT
             budget -= len(out)
+            seeds.append(info)
+            if read_paths is not None:
+                read_paths.append(info.path)
             call = ToolCall(id=f"preread{n}", name="read_note", arguments={"path": info.path})
             calls.append(call)
             outputs.append(Message(role="tool", text=out, tool_call_id=call.id))
+        if seeds and self.links.depth > 0 and QUESTION_PEOPLE_RE.search(question):
+            self._follow_links(seeds, question, MAX_PREREAD_CHARS - budget, calls, outputs, read_paths)
         if not calls:
             return []
         return [Message(role="assistant", text="", tool_calls=calls), *outputs]
 
-    async def answer(self, history: list[Message]) -> AgentResult:
+    def _follow_links(self, seeds: list[NoteInfo], question: str, used: int, calls: list[ToolCall],
+                      outputs: list[Message], read_paths: list[str] | None) -> None:
+        """Read the notes the named notes link to (breadth first, within the link budget) as more read_note results."""
+        try:
+            trail = self.notes.follow_links(seeds, question, self.links, seed_chars_used=used)
+        except OSError:
+            return
+        followed = trail.followed
+        if not followed:
+            return
+        for n, linked in enumerate(followed, 1):
+            call = ToolCall(id=f"link{n}", name="read_note", arguments={"path": linked.info.path})
+            calls.append(call)
+            outputs.append(Message(role="tool", text=linked.text, tool_call_id=call.id))
+            if read_paths is not None:
+                read_paths.append(linked.info.path)
+        lines = [f"Followed [[links]] between notes (up to {self.links.depth} steps, {self.links.max_notes} notes): "
+                 + "; ".join(f"{l.info.title} (step {l.depth}, from {l.via})" for l in followed) + "."]
+        if trail.skipped_hubs:
+            lines.append("Not followed, hub notes (read one only if the question is about it): "
+                         + ", ".join(trail.skipped_hubs[:15]) + ".")
+        if trail.over_budget:
+            lines.append("Not read, over the reading budget (read_note them if needed): "
+                         + ", ".join(trail.over_budget[:15]) + ".")
+        call = ToolCall(id="links_summary", name="follow_links", arguments={})
+        calls.append(call)
+        outputs.append(Message(role="tool", text="\n".join(lines), tool_call_id=call.id))
+
+    def notes_read_line(self, paths: list[str]) -> str:
+        titles: list[str] = []
+        for path in paths:
+            title = path.rsplit("/", 1)[-1].removesuffix(".md")
+            if title not in titles:
+                titles.append(title)
+        return "Notes read: " + ", ".join(titles)
+
+    async def answer(self, history: list[Message], asker: Asker | None = None) -> AgentResult:
         started = time.monotonic()
         messages = list(history)
         result = AgentResult(text="")
-        pre = self.preread_messages(history)
+        read_paths: list[str] = []
+        pre = self.preread_messages(history, asker, read_paths)
+        linked = any(c.name == "follow_links" for c in pre[0].tool_calls) if pre else False
         if pre:
             messages.extend(pre)
             result.tools_used.extend(c.name for c in pre[0].tool_calls)
@@ -184,12 +257,16 @@ class Agent:
             for call in turn.tool_calls:
                 result.tools_used.append(call.name)
                 output = await self.run_tool(call.name, call.arguments)
+                if call.name == "read_note" and not output.startswith("Error"):
+                    read_paths.append(str(call.arguments.get("path", "")).strip().lstrip("/"))
                 messages.append(Message(role="tool", text=output, tool_call_id=call.id))
         else:
             result.truncated = True
         if not result.text:
             result.truncated = True
             result.text = "I could not finish looking that up. Try a narrower question."
+        if linked and not result.truncated:
+            result.text = result.text.rstrip() + "\n\n" + self.notes_read_line(read_paths)
         result.seconds = time.monotonic() - started
         log.info(
             "answered turns=%d tools=%s in=%d cached=%d out=%d secs=%.1f",

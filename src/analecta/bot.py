@@ -7,7 +7,7 @@ from collections.abc import Iterable
 
 import discord
 
-from .agent import Agent
+from .agent import Agent, Asker
 from .clearances import pinned_note
 from .corrections import (CORRECT, MAX_CORRECTION_CHARS, WRONG, CorrectionStore, classify_reply, is_thumbs_down,
                           scrub)
@@ -72,7 +72,7 @@ class AnalectaBot(discord.Client):
         try:
             history = await self._history(message, question)
             async with self._slots, message.channel.typing():
-                result = await self.agent.answer(history)
+                result = await self.agent.answer(history, _asker(message.author))
             for part in split_message(result.text):
                 await message.reply(part, mention_author=False)
         except ProviderError as exc:
@@ -215,6 +215,17 @@ class _Place:
 
     def __init__(self, guild: object, channel: object):
         self.guild, self.channel = guild, channel
+
+
+def _asker(user: object) -> Asker:
+    """The names a member appears under, most specific first: server nickname, display name, global name, username."""
+    names: list[str] = []
+    for attr in ("nick", "display_name", "global_name", "name"):
+        value = getattr(user, attr, None)
+        if isinstance(value, str) and value.strip() and value not in names:
+            names.append(value)
+    user_id = getattr(user, "id", None)
+    return Asker(user_id if isinstance(user_id, int) else None, tuple(names))
 
 
 def _display_name(user: object) -> str:
