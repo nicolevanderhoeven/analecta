@@ -105,10 +105,13 @@ class Check:
         return ", ".join(f"{name} {value:+d}" for name, value in self.parts)
 
 
-def _check(build: dict, label: str, rank: int, ability: str, extra_names: tuple[str, ...]) -> Check:
+def _check(build: dict, label: str, rank: int, ability: str, extra_names: tuple[str, ...],
+           abilities: dict[str, int] | None = None) -> Check:
+    """`abilities` (modifiers, not scores) replaces the sheet's own: the proficiency, level and item bonus still
+    come from `build`. That is how a companion is worked out from its summoner."""
     lvl = level(build)
     prof = rank + lvl if rank > 0 else 0
-    mod = ability_mod(build, ability)
+    mod = ability_mod(build, ability) if abilities is None else as_int(abilities.get(ability))
     item = item_bonus(build, *extra_names)
     parts = [(RANK_NAMES[rank], rank)]
     if rank > 0:
@@ -123,18 +126,24 @@ def _normal(text: str) -> str:
     return " ".join(text.lower().replace("_", " ").split())
 
 
-def resolve(build: dict, text: str) -> Check | None:
-    """The check a typed name refers to: a skill, Perception, a save, or a Lore (`Dwarven Lore`, `lore dwarven`)."""
+def resolve(build: dict, text: str, abilities: dict[str, int] | None = None) -> Check | None:
+    """The check a typed name refers to: a skill, Perception, a save, or a Lore (`Dwarven Lore`, `lore dwarven`).
+
+    With `abilities` (a companion's six modifiers) the totals use those modifiers on top of the build's proficiency,
+    level and item bonuses, and Lores are not offered (a companion has none of its own).
+    """
     name = _normal(text)
     if not name:
         return None
     name = ALIASES.get(name, name)
     if name in SKILLS:
-        return _check(build, name.capitalize(), rank_of(build, name), SKILLS[name], (name,))
+        return _check(build, name.capitalize(), rank_of(build, name), SKILLS[name], (name,), abilities)
     if name == "perception":
-        return _check(build, "Perception", rank_of(build, "perception"), "wis", ("perception",))
+        return _check(build, "Perception", rank_of(build, "perception"), "wis", ("perception",), abilities)
     if name in SAVES:
-        return _check(build, name.capitalize(), rank_of(build, name), SAVES[name], (name,))
+        return _check(build, name.capitalize(), rank_of(build, name), SAVES[name], (name,), abilities)
+    if abilities is not None:
+        return None
     bare = re.sub(r"^lore\s+|\s+lore$", "", name).strip()
     matches = [(n, r) for n, r in lores(build) if re.sub(r"\s+lore$", "", _normal(n)) == bare]
     if matches and bare:
@@ -144,12 +153,20 @@ def resolve(build: dict, text: str) -> Check | None:
     return None
 
 
-def stat_names(build: dict) -> list[str]:
+def stat_names(build: dict, companion: bool = False) -> list[str]:
     """Every stat that can be rolled, for help text and autocomplete."""
     names = [s.capitalize() for s in SKILLS] + ["Perception"] + [s.capitalize() for s in SAVES]
+    if companion:
+        return names
     for lore_name, _ in lores(build):
         names.append(lore_name if lore_name.lower().endswith("lore") else f"{lore_name} Lore")
     return names
+
+
+def has_eidolon(build: dict) -> bool:
+    """True when the export's `specials` mention an eidolon (the file holds no eidolon stats, only its features)."""
+    specials = build.get("specials")
+    return isinstance(specials, list) and any(isinstance(x, str) and "eidolon" in x.lower() for x in specials)
 
 
 def armour_class(build: dict) -> int | None:
@@ -162,6 +179,22 @@ def hit_points(build: dict) -> int:
     lvl = level(build)
     per_level = as_int(attrs.get("classhp")) + as_int(attrs.get("bonushpPerLevel")) + ability_mod(build, "con")
     return as_int(attrs.get("ancestryhp")) + per_level * lvl + as_int(attrs.get("bonushp"))
+
+
+def companion_summary(build: dict, name: str, kind: str, owner: str, abilities: dict[str, int], ac: int | None) -> str:
+    """A readable companion summary: its modifiers, and the saves, Perception and skills it gets from its summoner."""
+    lines = [f"**{escape(name)}** \u2014 {escape(kind)} of {escape(owner)}",
+             "Abilities: " + ", ".join(f"{a.capitalize()} {as_int(abilities.get(a)):+d}" for a in ABILITIES)]
+    if ac is not None:
+        lines.append(f"AC {ac}")
+    perception = resolve(build, "perception", abilities)
+    saves = [resolve(build, s, abilities) for s in SAVES]
+    lines.append("Perception " + f"{perception.total:+d}" + " \u00b7 " + ", ".join(f"{c.label} {c.total:+d}" for c in saves if c))
+    skills = [c for c in (resolve(build, s, abilities) for s in SKILLS) if c]
+    lines.append("Skills: " + ", ".join(f"{c.label} {c.total:+d}" for c in skills))
+    lines.append(f"_Worked out from {escape(owner)}'s saved sheet: the summoner's proficiency and item bonuses with the "
+                 f"{escape(kind)}'s own ability modifiers. Conditions and temporary bonuses are not included._")
+    return "\n".join(lines)
 
 
 def summary(build: dict) -> str:

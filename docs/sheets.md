@@ -31,10 +31,40 @@ sheet; the last 10 uploads are kept. `/sheet help` shows these steps in Discord.
 | `/character register character: [user:]` | Link yourself (or, if you own the sheet or are a GM, another player) to a saved character. |
 | `/character unregister [user:]` | Remove that link; the sheet stays. |
 | `/character list` | The saved characters and who plays each. |
+| `/companion add character: name: kind:eidolon str: dex: con: int: wis: cha: [ac:]` | Attach an eidolon to a character (owner or GM). Giving an existing name updates it. |
+| `/companion show [character]` | A companion's modifiers and the saves, Perception and skills it gets. `character` may be the character or the companion's name. |
+| `/companion remove [character] [name]` | Remove a companion (owner or GM). |
+| `/roll ... companion:True` | Roll as your own character's companion (`character:Ash` does the same by name). |
 
 Adding your first sheet registers you to it automatically. With a registered character you never need to name one:
 `/roll Religion -2` uses yours. The roll always shows its working: the d20, the sheet total, the extra modifier,
 and how the sheet total was made, labelled "from saved sheet".
+
+## Companions (eidolons)
+
+Pathbuilder's export names an eidolon in the character's features but does **not** include its stats, so an eidolon
+has no sheet of its own. Add it by hand, once: in Pathbuilder open the eidolon and read its six ability
+**modifiers** (not the scores), then
+
+    /companion add character:Zuhri name:Ash kind:eidolon str:4 dex:3 con:4 int:0 wis:1 cha:0
+
+(`ac:` is optional and is only shown, never worked out.) `/sheet add` reminds you of this when the export mentions an
+eidolon and none is saved. Re-run `/companion add` with the same name to change a modifier, for example at a level-up.
+
+**The rule:** an eidolon uses its summoner's proficiency bonuses and item bonuses for every save, Perception and skill,
+with its own ability modifiers. So each total is the eidolon's ability modifier + the summoner's proficiency (rank plus
+level, nothing if untrained) + the summoner's item bonus for that statistic: Intimidation is 0 + 13 + 1 = 14 for an
+eidolon with Cha +0 whose summoner has master Intimidation at level 7 and a +1 item. The totals follow the summoner's
+saved sheet, so re-uploading the summoner updates the eidolon too. A companion has no Lores of its own, and its
+Armour Class, HP and attacks are not worked out. Animal companions and familiars are not supported yet.
+
+Roll for one with `/roll Athletics character:Ash`, or `/roll Athletics companion:True` for the companion of your own
+registered character. The result is labelled "from saved sheet (eidolon of Zuhri)" and shows the working. Companion
+names cannot repeat a character's or another companion's name (so rolls are never ambiguous), and a character has at
+most four companions.
+
+In questions, if your character has a companion, "my eidolon", "my companion" and the companion's name mean it: the bot
+reads its campaign note (a note with that name or alias) and is told its name and kind, nothing else.
 
 ## What the totals include
 
@@ -57,7 +87,8 @@ modifier (`/roll Athletics -1`). Variant rules such as proficiency without level
 
 Plain JSON files under `SHEETS_DIR` (default `/var/lib/analecta/sheets`), outside the repository and outside the
 notes and corrections folders: one folder per character with the owner's Discord ID, the character's name, and
-the last 10 uploaded files untouched, plus `registrations.json` (which Discord user plays which character). The
+the last 10 uploaded files untouched, a `companions` folder with each companion (name, kind, ability modifiers, optional
+AC) versioned the same way, plus `registrations.json` (which Discord user plays which character). The
 folder is mode 750 and readable only by the bot's service account. Nothing about a sheet is logged. The bot is the only
 reader: the same registration file tells the notes link-follower which note is a member's character (it passes
 only the character's name to find the note, not the sheet). Backing the folder up is up to the person running the bot.

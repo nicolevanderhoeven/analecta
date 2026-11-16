@@ -27,6 +27,9 @@ from . import pf2e
 MAX_VERSIONS = 10
 MAX_SHEET_BYTES = 2 * 1024 * 1024
 MAX_NAME_CHARS = 60
+KINDS = ("eidolon",)               # room for "animal companion" and "familiar" later
+MAX_COMPANIONS = 4                 # per character
+ABILITY_MOD_RANGE = (-5, 15)
 _ID = re.compile(r"[0-9a-f]{16}")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f​-‏ -‮⁦-⁩]")
 
@@ -52,6 +55,18 @@ class AddResult:
     registered: bool        # the uploader was registered to this character by the upload
     level: int
     class_name: str
+    suggest_eidolon: bool = False   # the export names an eidolon and no companion is saved for it yet
+
+
+@dataclass(frozen=True)
+class Companion:
+    id: str
+    character: SheetInfo            # the character it belongs to
+    name: str
+    kind: str
+    abilities: dict[str, int]       # the six ability modifiers
+    ac: int | None
+    updated: str
 
 
 def clean_name(value: object) -> str:
@@ -211,7 +226,8 @@ class SheetStore:
             registered = True
         build = pf2e.build_of(data)
         return AddResult(info=info, created=created, versions=self.version_count(info), registered=registered,
-                         level=pf2e.level(build), class_name=clean_name(build.get("class")))
+                         level=pf2e.level(build), class_name=clean_name(build.get("class")),
+                         suggest_eidolon=pf2e.has_eidolon(build) and not self.companions(info))
 
     def delete(self, actor_id: int, name: str) -> SheetInfo:
         info = self.get(name)
@@ -293,3 +309,98 @@ class SheetStore:
         regs.pop(target, None)
         self._write_registrations(regs)
         return info
+
+    # -- companions: stored inside the owning character's folder, versioned like sheets ----------------------
+    # <dir>/<sheet id>/companions/<random id>/versions/<UTC>.json   {name, kind, abilities, ac, updated}
+    def _companion_dir(self, info: SheetInfo) -> Path:
+        return self.root / info.id / "companions"
+
+    def _read_companion(self, info: SheetInfo, folder: Path) -> Companion | None:
+        try:
+            latest = sorted((folder / "versions").glob("*.json"))[-1]
+            raw = json.loads(latest.read_text(encoding="utf-8"))
+            abilities = {a: pf2e.as_int(raw["abilities"][a]) for a in pf2e.ABILITIES}
+            name = clean_name(raw["name"])
+            kind = raw["kind"] if raw["kind"] in KINDS else ""
+            ac = raw.get("ac")
+            if not name or not kind or not _ID.fullmatch(folder.name):
+                return None
+            return Companion(id=folder.name, character=info, name=name, kind=kind, abilities=abilities,
+                             ac=pf2e.as_int(ac) if ac is not None else None, updated=str(raw.get("updated", "")))
+        except (OSError, ValueError, KeyError, TypeError, IndexError):
+            return None  # one bad companion must not break the others
+
+    def companions(self, info: SheetInfo) -> list[Companion]:
+        try:
+            folders = sorted(p for p in self._companion_dir(info).iterdir() if p.is_dir())
+        except OSError:
+            return []
+        found = [c for c in (self._read_companion(info, f) for f in folders) if c is not None]
+        return sorted(found, key=lambda c: c.name.casefold())
+
+    def all_companions(self) -> list[Companion]:
+        return [c for info in self.list() for c in self.companions(info)]
+
+    def find_companions(self, name: str) -> list[Companion]:
+        wanted = _key(name)
+        return [c for c in self.all_companions() if wanted and c.name.casefold() == wanted]
+
+    def companions_for_user(self, user_id: int) -> list[tuple[str, str]]:
+        """(name, kind) of each companion of the character a Discord user is registered to, for the question agent."""
+        info = self.character_for(user_id)
+        return [(c.name, c.kind) for c in self.companions(info)] if info else []
+
+    def add_companion(self, actor_id: int, character: str, name: str, kind: str, abilities: dict[str, int],
+                      ac: int | None = None) -> tuple[Companion, bool]:
+        """Add a companion to a character, or update the one of that name. Returns (companion, created)."""
+        info = self.get(character)
+        self._require_manage(actor_id, info, "add a companion to it")
+        name = clean_name(name)
+        if not name:
+            raise SheetError("A companion needs a name.")
+        kind = " ".join(str(kind or "").lower().split())
+        if kind not in KINDS:
+            raise SheetError(f"I only know these kinds of companion: {', '.join(KINDS)}.")
+        lo, hi = ABILITY_MOD_RANGE
+        clean: dict[str, int] = {}
+        for ability in pf2e.ABILITIES:
+            value = abilities.get(ability)
+            if isinstance(value, bool) or not isinstance(value, int) or not lo <= value <= hi:
+                raise SheetError(f"Give {ability.upper()} as the ability modifier (a whole number from {lo} to {hi}), "
+                                 "not the score.")
+            clean[ability] = value
+        if ac is not None and not 0 <= ac <= 80:
+            raise SheetError("AC should be a whole number from 0 to 80.")
+        mine = next((c for c in self.companions(info) if c.name.casefold() == name.casefold()), None)
+        if mine is None:
+            if self.find(name) is not None or self.find_companions(name):
+                raise SheetError(f"The name {pf2e.escape(name)} is already used by a saved character or companion. "
+                                 "Pick a different name so rolls can tell them apart.")
+            if len(self.companions(info)) >= MAX_COMPANIONS:
+                raise SheetError(f"{pf2e.escape(info.name)} already has {MAX_COMPANIONS} companions.")
+        cid = mine.id if mine else secrets.token_hex(8)
+        folder = self._companion_dir(info) / cid
+        (folder / "versions").mkdir(parents=True, exist_ok=True)
+        for d in (self._companion_dir(info), folder):
+            os.chmod(d, 0o750)
+        stamp = _now()
+        version = datetime.fromtimestamp(self._clock(), timezone.utc).strftime("%Y%m%dT%H%M%S%fZ.json")
+        _atomic_write(folder / "versions" / version,
+                      json.dumps({"name": name, "kind": kind, "abilities": clean, "ac": ac, "updated": stamp}).encode())
+        for old in sorted((folder / "versions").glob("*.json"))[:-self.max_versions]:
+            old.unlink(missing_ok=True)
+        return Companion(id=cid, character=info, name=name, kind=kind, abilities=clean, ac=ac, updated=stamp), mine is None
+
+    def remove_companion(self, actor_id: int, character: str, name: str | None = None) -> Companion:
+        info = self.get(character)
+        self._require_manage(actor_id, info, "remove its companion")
+        comps = self.companions(info)
+        if name and name.strip():
+            comps = [c for c in comps if c.name.casefold() == _key(name)]
+        if not comps:
+            raise SheetError(f"{pf2e.escape(info.name)} has no companion" + (f" called {pf2e.escape(clean_name(name))}" if name and name.strip() else "") + ".")
+        if len(comps) > 1:
+            raise SheetError(f"{pf2e.escape(info.name)} has several companions ({', '.join(pf2e.escape(c.name) for c in comps)}). "
+                             "Say which with the name option.")
+        shutil.rmtree(self._companion_dir(info) / comps[0].id)
+        return comps[0]

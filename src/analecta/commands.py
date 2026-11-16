@@ -1,5 +1,5 @@
-"""Slash commands for dice and character sheets: /roll, /sheet (add, show, export, delete, help) and /character
-(register, list, unregister).
+"""Slash commands for dice and character sheets: /roll, /sheet (add, show, export, delete, help), /character
+(register, list, unregister) and /companion (add, show, remove).
 
 `DiceCommands` holds the behaviour as plain async methods so tests can call them with a fake interaction;
 `register_commands` wraps them as discord.py application commands. Sheet data is never logged and never sent to a
@@ -19,7 +19,7 @@ from discord import app_commands
 from . import dice, pf2e
 from .gating import is_allowed_interaction, split_message
 from .rolling import escape, roll
-from .sheets import MAX_SHEET_BYTES, MAX_VERSIONS, SheetError, SheetStore
+from .sheets import KINDS, MAX_SHEET_BYTES, MAX_VERSIONS, Companion, SheetError, SheetStore
 
 log = logging.getLogger("analecta.commands")
 
@@ -34,6 +34,7 @@ SHEET_HELP = f"""\
 3. In this channel, run `/sheet add` and attach the file. Only you see my reply. Everyone in the channel can then roll for and view your character.
 
 **Rolling:** `/roll 1d20+5` for plain dice. `/roll Religion -2` rolls your Religion skill plus an extra modifier (skills, saves, Perception and Lores work). Add `character:` to roll for someone else's character, and `secret:` to see the result only yourself.
+**Companions:** an eidolon has no sheet of its own. `/companion add` attaches one to a character with its six ability modifiers; its saves, Perception and skills then use the summoner's proficiency and item bonuses. Roll for it with `/roll Athletics character:Ash`, or `companion:True` for your own character's. `/companion show` and `/companion remove` do the rest.
 **Your character:** adding a sheet registers you to it if you have none. `/character register` links you to a different one (or links another player, if you own the sheet or are a GM); `/character list` shows who is who.
 **Keeping it:** I save your sheet file on my server and keep your last {MAX_VERSIONS} uploads, so re-adding the same character updates it. `/sheet export` gives you the file back (this is a copy of the export, not something Pathbuilder can import). `/sheet delete` erases it and every earlier version. I do not send sheets to any language model.
 **Limits:** totals are worked out from the file. Conditions, armour check penalties and temporary bonuses are not in it; put them in the extra modifier."""
@@ -74,9 +75,10 @@ class DiceCommands:
         return is_allowed_interaction(interaction, self.locations)
 
     # -- /roll -----------------------------------------------------------------------------------------------
-    async def roll(self, interaction: Any, what: str, character: str | None = None, secret: bool = False) -> None:
+    async def roll(self, interaction: Any, what: str, character: str | None = None, secret: bool = False,
+                   companion: bool = False) -> None:
         try:
-            outcome = roll(self.store, interaction.user.id, what, character, self.rng)
+            outcome = roll(self.store, interaction.user.id, what, character, self.rng, companion)
         except Exception as exc:  # SheetError is expected; anything else is reported without details
             await self._fail(interaction, exc)
             return
@@ -106,6 +108,10 @@ class DiceCommands:
         verb = "Saved" if result.created else "Updated"
         ident = f"level {result.level}" + (f" {escape(result.class_name)}" if result.class_name else "")
         lines = [f"{verb} **{escape(result.info.name)}**, {ident} (saved copies kept: {result.versions} of {MAX_VERSIONS})."]
+        if result.suggest_eidolon:
+            lines.append("Your export mentions an eidolon, but Pathbuilder does not export its stats. Add it with "
+                         f"`/companion add character:{escape(result.info.name)} name: kind:eidolon` and its six ability "
+                         "modifiers (see them in Pathbuilder's eidolon section); then you can roll for it.")
         if result.registered:
             lines.append("You are now registered to this character, so `/roll` uses it by default.")
         elif result.created:
@@ -196,7 +202,66 @@ class DiceCommands:
             lines.append(f"- **{escape(info.name)}**: {players}")
         await self._send(interaction, "\n".join(lines))
 
+    # -- /companion ------------------------------------------------------------------------------------------
+    async def companion_add(self, interaction: Any, character: str, name: str, kind: str, str_: int, dex: int, con: int,
+                            int_: int, wis: int, cha: int, ac: int | None = None) -> None:
+        mods = dict(zip(pf2e.ABILITIES, (str_, dex, con, int_, wis, cha)))
+        try:
+            comp, created = self.store.add_companion(interaction.user.id, character, name, kind, mods, ac)
+        except Exception as exc:
+            await self._fail(interaction, exc)
+            return
+        verb = "Added" if created else "Updated"
+        await self._send(interaction, f"{verb} **{escape(comp.name)}**, {escape(comp.kind)} of **{escape(comp.character.name)}**. "
+                                      f"Roll for it with `/roll Athletics character:{escape(comp.name)}`"
+                                      + (f", or `/roll Athletics companion:True` as {escape(comp.character.name)}'s player." if created else "."))
+
+    def _companions_of(self, interaction: Any, character: str | None) -> list[Companion]:
+        text = character.strip() if character and character.strip() else ""
+        if text:
+            named = self.store.find_companions(text)
+            if named:
+                return named
+        return self.store.companions(self._character_for(interaction, character))
+
+    async def companion_show(self, interaction: Any, character: str | None = None) -> None:
+        try:
+            comps = self._companions_of(interaction, character)
+            if not comps:
+                await self._send(interaction, "That character has no companion saved. Add one with `/companion add`.")
+                return
+            lines = []
+            for comp in comps:
+                build = self.store.build(comp.character)
+                lines.append(pf2e.companion_summary(build, comp.name, comp.kind, comp.character.name, comp.abilities, comp.ac))
+        except Exception as exc:
+            await self._fail(interaction, exc)
+            return
+        await self._send(interaction, "\n\n".join(lines))
+
+    async def companion_remove(self, interaction: Any, character: str | None = None, name: str | None = None) -> None:
+        try:
+            if name is None and character and self.store.find_companions(character):
+                comp = self.store.find_companions(character)[0]
+                character, name = comp.character.name, comp.name
+            info = self._character_for(interaction, character)
+            comp = self.store.remove_companion(interaction.user.id, info.name, name)
+        except Exception as exc:
+            await self._fail(interaction, exc)
+            return
+        await self._send(interaction, f"Removed **{escape(comp.name)}** from **{escape(comp.character.name)}**.")
+
     # -- autocomplete ----------------------------------------------------------------------------------------
+    async def character_and_companion_choices(self, interaction: Any, current: str) -> list[app_commands.Choice[str]]:
+        if not self.allowed(interaction):
+            return []
+        try:
+            names = [i.name for i in self.store.list()] + [c.name for c in self.store.all_companions()]
+        except OSError:
+            return []
+        needle = current.strip().casefold()
+        return [app_commands.Choice(name=n[:100], value=n[:100]) for n in names if needle in n.casefold()][:25]
+
     async def character_choices(self, interaction: Any, current: str) -> list[app_commands.Choice[str]]:
         if not self.allowed(interaction):
             return []
@@ -232,13 +297,15 @@ def register_commands(tree: app_commands.CommandTree, cmds: DiceCommands) -> Non
 
     @tree.command(name="roll", description="Roll dice (1d20+5) or a skill from your saved sheet (Religion -2)")
     @app_commands.describe(what="Dice such as 1d20+5, or a skill, save, Perception or Lore with an optional modifier",
-                           character="Roll for this character instead of your own",
-                           secret="Show the result only to you")
+                           character="Roll for this character or companion instead of your own character",
+                           secret="Show the result only to you",
+                           companion="Roll as your character's companion (for example your eidolon)")
     @app_commands.guild_only()
-    async def roll_cmd(interaction: discord.Interaction, what: str, character: str | None = None, secret: bool = False):
-        await cmds.roll(interaction, what, character, secret)
+    async def roll_cmd(interaction: discord.Interaction, what: str, character: str | None = None, secret: bool = False,
+                       companion: bool = False):
+        await cmds.roll(interaction, what, character, secret, companion)
 
-    roll_cmd.autocomplete("character")(cmds.character_choices)
+    roll_cmd.autocomplete("character")(cmds.character_and_companion_choices)
 
     sheet = app_commands.Group(name="sheet", description="Your saved character sheet", guild_only=True)
 
@@ -287,5 +354,34 @@ def register_commands(tree: app_commands.CommandTree, cmds: DiceCommands) -> Non
 
     character.get_command("register").autocomplete("character")(cmds.character_choices)
 
+    companion = app_commands.Group(name="companion", description="A character's eidolon or other companion", guild_only=True)
+    kinds = [app_commands.Choice(name=k, value=k) for k in KINDS]
+
+    @companion.command(name="add", description="Add or update a character's companion (owner or GM)")
+    @app_commands.describe(character="The character it belongs to", name="The companion's name", kind="What it is",
+                           str_="Strength modifier, such as 4", dex="Dexterity modifier", con="Constitution modifier",
+                           int_="Intelligence modifier", wis="Wisdom modifier", cha="Charisma modifier",
+                           ac="Armour Class, if you want it shown")
+    @app_commands.rename(str_="str", int_="int")
+    @app_commands.choices(kind=kinds)
+    async def companion_add(interaction: discord.Interaction, character: str, name: str, kind: app_commands.Choice[str],
+                            str_: int, dex: int, con: int, int_: int, wis: int, cha: int, ac: int | None = None):
+        await cmds.companion_add(interaction, character, name, kind.value, str_, dex, con, int_, wis, cha, ac)
+
+    @companion.command(name="show", description="Show a character's companions and their totals")
+    @app_commands.describe(character="A character or companion; defaults to your own character")
+    async def companion_show(interaction: discord.Interaction, character: str | None = None):
+        await cmds.companion_show(interaction, character)
+
+    @companion.command(name="remove", description="Remove a companion (owner or GM)")
+    @app_commands.describe(character="The character (or the companion itself); defaults to your own", name="Which companion")
+    async def companion_remove(interaction: discord.Interaction, character: str | None = None, name: str | None = None):
+        await cmds.companion_remove(interaction, character, name)
+
+    companion.get_command("add").autocomplete("character")(cmds.character_choices)
+    for name in ("show", "remove"):
+        companion.get_command(name).autocomplete("character")(cmds.character_and_companion_choices)
+
     tree.add_command(sheet)
     tree.add_command(character)
+    tree.add_command(companion)

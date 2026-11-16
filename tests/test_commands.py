@@ -230,7 +230,7 @@ def test_bot_registers_the_commands_and_syncs_only_to_configured_servers(tmp_pat
     store, _ = make(tmp_path)
     bot = AnalectaBot(agent=None, locations=[(GUILD, CHANNEL), (2, 20)], limiter=Limiter(0, 10), sheets=store)
     names = {c.name for c in bot.tree.get_commands()}
-    assert names == {"roll", "sheet", "character"}
+    assert names == {"roll", "sheet", "character", "companion"}
     sheet = bot.tree.get_command("sheet")
     assert {c.name for c in sheet.commands} == {"help", "add", "show", "export", "delete"}
     assert {c.name for c in bot.tree.get_command("character").commands} == {"register", "list", "unregister"}
@@ -256,5 +256,5 @@ def test_register_commands_roll_option_names():
     tree = AnalectaTree(_client(), cmds)
     register_commands(tree, cmds)
     roll = tree.get_command("roll")
-    assert [p.name for p in roll.parameters] == ["what", "character", "secret"]
-    assert [p.required for p in roll.parameters] == [True, False, False]
+    assert [p.name for p in roll.parameters] == ["what", "character", "secret", "companion"]
+    assert [p.required for p in roll.parameters] == [True, False, False, False]

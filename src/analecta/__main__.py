@@ -59,7 +59,8 @@ def main(argv: list[str] | None = None) -> int:
               "saving character sheets will fail until it exists and is writable.", file=sys.stderr)
     agent = Agent(make_provider(settings), notes, aon, partial(build_system_prompt, owner=settings.bot_owner),
                   settings.max_tool_turns, corrections=corrections, links=settings.links,
-                  character_map=settings.character_map, registered_character=sheets.character_name_for)
+                  character_map=settings.character_map, registered_character=sheets.character_name_for,
+                  registered_companions=sheets.companions_for_user)
     bot = AnalectaBot(
         agent=agent,
         corrections=corrections,
