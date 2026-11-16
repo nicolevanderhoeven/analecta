@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
@@ -13,6 +14,7 @@ from .notes import FIRST_PERSON_RE, OWNERSHIP_RE, QUESTION_PEOPLE_RE, LinkPolicy
 
 log = logging.getLogger("analecta.agent")
 
+COMPANION_RE = re.compile(r"(?<![\w'])(?:my|our)\s+(?:animal\s+)?(eidolon|companion|familiar)(?![\w])", re.IGNORECASE)
 MAX_TOOL_RESULT_CHARS = 12000
 PREREAD_CUT = "\n[truncated; call read_note again with a later start_line]"
 MAX_PREREAD_CHARS = 24000  # total across all notes read up front
@@ -84,7 +86,8 @@ class Agent:
                  system_builder: Callable[[str], str], max_turns: int = 8,
                  corrections: CorrectionStore | None = None, links: LinkPolicy | None = None,
                  character_map: dict[int, str] | None = None,
-                 registered_character: Callable[[int], str | None] | None = None):
+                 registered_character: Callable[[int], str | None] | None = None,
+                 registered_companions: Callable[[int], list[tuple[str, str]]] | None = None):
         self.provider = provider
         self.notes = notes
         self.corrections = corrections
@@ -92,6 +95,7 @@ class Agent:
         self.links = links if links is not None else LinkPolicy()
         self.character_map = dict(character_map or {})
         self.registered_character = registered_character  # the registration store: tried before the env map
+        self.registered_companions = registered_companions  # (name, kind) of the asker's character's companions
         self.max_turns = max_turns
         self._system_builder = system_builder
         self._system = ""
@@ -158,6 +162,46 @@ class Agent:
         except OSError:
             return None
 
+    def _companion_context(self, asker: Asker | None, question: str, character: NoteInfo | None, infos: list[NoteInfo],
+                           calls: list[ToolCall], outputs: list[Message]) -> None:
+        """Tell the model the asker's companion and put its note among the notes read when the question means it.
+
+        Only the companion's name and kind leave the sheet store; "my eidolon", "my companion" or its name stand for
+        its note (found by name like any other note).
+        """
+        if asker is None or asker.user_id is None or self.registered_companions is None:
+            return
+        try:
+            comps = self.registered_companions(asker.user_id)
+        except OSError:
+            return
+        if not comps:
+            return
+        listing = "; ".join(f"{name} ({kind})" for name, kind in comps)
+        text = (f"Their character also has a companion: {listing}. When they say my eidolon, my companion or the "
+                "companion's name, they mean that companion, so use the companion's own note.")
+        if character is not None:
+            for output in outputs:
+                if output.tool_call_id == "asker1":
+                    output.text += " " + text
+                    break
+        else:
+            call = ToolCall(id="asker_companion", name="asker_companion", arguments={})
+            calls.append(call)
+            outputs.append(Message(role="tool", tool_call_id=call.id, text="The person asking has a registered character. " + text))
+        word = COMPANION_RE.search(question)
+        wanted = (word.group(1).lower() if word else "")
+        for name, kind in comps:
+            named = re.search(rf"(?<!\w){re.escape(name)}(?!\w)", question, re.IGNORECASE)
+            if not named and not (wanted and (wanted == "companion" or wanted == kind)):
+                continue
+            try:
+                hit = self.notes.find_character([], name)
+            except OSError:
+                continue
+            if hit is not None and all(i.path != hit.path for i in infos):
+                infos.insert(0, hit)
+
     def preread_messages(self, history: list[Message], asker: Asker | None = None,
                          read_paths: list[str] | None = None) -> list[Message]:
         """Already-made tool calls and results placed before the model's first turn.
@@ -188,6 +232,7 @@ class Agent:
                 f"say my, me or I, they mean {character.title}, unless they name someone else.")))
             if (OWNERSHIP_RE.search(question) or (not infos and FIRST_PERSON_RE.search(question))) and all(i.path != character.path for i in infos):
                 infos.insert(0, character)
+        self._companion_context(asker, question, character, infos, calls, outputs)
         budget = MAX_PREREAD_CHARS
         seeds: list[NoteInfo] = []
         for n, info in enumerate(infos, 1):

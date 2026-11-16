@@ -1,0 +1,84 @@
+{
+ "success": true,
+ "build": {
+  "name": "Test Summoner",
+  "class": "Summoner",
+  "level": 7,
+  "ancestry": "Human",
+  "heritage": "Versatile Heritage",
+  "background": "Scholar",
+  "alignment": "N",
+  "deity": "Not set",
+  "keyability": "cha",
+  "abilities": {
+   "str": 10,
+   "dex": 14,
+   "con": 12,
+   "int": 10,
+   "wis": 12,
+   "cha": 18
+  },
+  "attributes": {
+   "ancestryhp": 8,
+   "classhp": 8,
+   "bonushp": 0,
+   "bonushpPerLevel": 0,
+   "speed": 25,
+   "speedBonus": 0
+  },
+  "proficiencies": {
+   "classDC": 2,
+   "perception": 4,
+   "fortitude": 4,
+   "reflex": 2,
+   "will": 4,
+   "acrobatics": 2,
+   "arcana": 0,
+   "athletics": 2,
+   "crafting": 0,
+   "deception": 2,
+   "diplomacy": 4,
+   "intimidation": 6,
+   "medicine": 2,
+   "nature": 2,
+   "occultism": 2,
+   "performance": 0,
+   "religion": 0,
+   "society": 0,
+   "stealth": 2,
+   "survival": 0,
+   "thievery": 0
+  },
+  "mods": {
+   "Athletics": {
+    "Item Bonus": 1
+   },
+   "Intimidation": {
+    "Item Bonus": 1
+   },
+   "Medicine": {
+    "Item Bonus": 1
+   }
+  },
+  "lores": [],
+  "feats": [],
+  "acTotal": {
+   "acProfBonus": 7,
+   "acAbilityBonus": 2,
+   "acItemBonus": 1,
+   "acTotal": 20,
+   "shieldBonus": "2"
+  },
+  "weapons": [],
+  "armor": [],
+  "equipment": [],
+  "money": {
+   "gp": 15
+  },
+  "spellCasters": [],
+  "specials": [
+   "Eidolon",
+   "Devotion Phantom Eidolon"
+  ]
+ }
+}

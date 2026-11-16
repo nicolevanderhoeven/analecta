@@ -43,7 +43,7 @@ Not published, endorsed, or specifically approved by Paizo.
   `/roll Religion -2` for a skill, save, Perception or Lore from a character sheet the player imported with
   `/sheet add` (a Pathbuilder 2e JSON file), plus an extra modifier. Each player is registered to a character
   (`/character register`), so a roll uses their own by default, and anyone can roll for another character with
-  `character:`. Plain code, no language model: sheets are never sent to OpenAI. See [docs/sheets.md](docs/sheets.md).
+  `character:`. An eidolon can be attached to a character (`/companion add`) and rolled too. Plain code, no language model: sheets are never sent to OpenAI (only a companion's name and kind go with a question). See [docs/sheets.md](docs/sheets.md).
 - **The group can correct it.** Reply to an answer with `/correct <the fix>` and it is saved as a *table correction*
   (with who and when) in `corrections.md`; later answers use those ahead of the notes and say so. A 👎 on an answer,
   or a reply saying "wrong", logs the question and answer to a review list, `misreads.md`. Both live outside the
