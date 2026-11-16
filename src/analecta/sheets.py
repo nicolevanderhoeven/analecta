@@ -201,6 +201,9 @@ class SheetStore:
         if existing is not None and not self.can_manage(actor_id, existing):
             raise SheetError(f"A character called {pf2e.escape(name)} is already saved and belongs to someone else. "
                              "Ask its owner or a GM to update it, or use a different character name.")
+        if existing is None and self.find_companions(name):
+            raise SheetError(f"The name {pf2e.escape(name)} is already used by a companion. "
+                             "Use a different character name so rolls can tell them apart.")
         stamp = _now()
         if existing is None:
             info = SheetInfo(id=secrets.token_hex(8), name=name, owner_id=actor_id, created=stamp, updated=stamp)

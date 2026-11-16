@@ -106,12 +106,12 @@ def test_names_must_be_unique_and_ambiguous_names_are_refused(store, tmp_path):
         store.add_companion(BLAIR, "Test Hero", "ash", "eidolon", ASH)
     with pytest.raises(SheetError, match="already used"):
         store.add_companion(BLAIR, "Test Hero", "Test Summoner", "eidolon", ASH)
-    # a character uploaded later under the companion's name makes the name ambiguous: refuse to guess
     data = json.loads(OTHER.read_text())
     data["build"]["name"] = "Ash"
-    store.add(GM, json.dumps(data).encode())
-    with pytest.raises(SheetError, match="More than one"):
-        rolling.roll(store, ALEX, "Will", "Ash", Seq(1))
+    with pytest.raises(SheetError, match="already used by a companion"):
+        store.add(GM, json.dumps(data).encode())
+    assert store.find("Ash") is None
+    rolling.roll(store, ALEX, "Will", "Ash", Seq(1))
 
 
 @pytest.mark.parametrize("bad", [dict(ASH, str=18), dict(ASH, dex=-9), {k: v for k, v in ASH.items() if k != "cha"}, dict(ASH, wis=True)])
