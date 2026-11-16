@@ -1,5 +1,8 @@
 # Deployment
 
+Starting from nothing (no droplet, no Discord application, no Syncthing yet)? Read
+[setup-from-scratch.md](setup-from-scratch.md) first; it links back here for each step.
+
 Placeholders: `<DROPLET_ADDRESS>` is the droplet's public address (look it up with
 `doctl compute droplet get analecta --format PublicIPv4`; never write it into this repository),
 `<MAC_DEVICE_ID>` and `<DROPLET_DEVICE_ID>` are Syncthing device IDs, `<SOURCE_DIR>` is the campaign notes folder.
@@ -8,7 +11,8 @@ Placeholders: `<DROPLET_ADDRESS>` is the droplet's public address (look it up wi
 
 | Thing | Where it goes |
 |---|---|
-| Discord application, bot and token | Discord Developer Portal. The token goes only into `/etc/analecta/analecta.env` on the server. |
+| A DigitalOcean droplet (Ubuntu 24.04) with your SSH key | DigitalOcean. See [setup-from-scratch.md](setup-from-scratch.md#5-create-the-droplet). |
+| Discord application, bot and token | Discord Developer Portal, step by step in [setup-from-scratch.md](setup-from-scratch.md#6-create-the-discord-application). The token goes only into `/etc/analecta/analecta.env` on the server. |
 | OpenAI project, key and the 25 USD monthly budget | OpenAI dashboard. The key goes only into the server's env file (and a local untracked file for evaluation). |
 
 Nothing in this repository creates accounts, applications or keys.

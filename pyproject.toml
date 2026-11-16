@@ -3,6 +3,8 @@ name = "analecta"
 version = "0.1.0"
 description = "Discord bot for a Pathfinder 2e group: rules with Archives of Nethys links, plus campaign notes questions."
 readme = "README.md"
+license = "AGPL-3.0-only"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
     "discord.py>=2.4,<3",
@@ -17,7 +19,7 @@ dev = ["pytest>=8"]
 analecta = "analecta.__main__:main"
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
