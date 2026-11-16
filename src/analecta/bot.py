@@ -9,10 +9,12 @@ import discord
 
 from .agent import Agent, Asker
 from .clearances import pinned_note
+from .commands import AnalectaTree, DiceCommands, register_commands
 from .corrections import (CORRECT, MAX_CORRECTION_CHARS, WRONG, CorrectionStore, classify_reply, is_thumbs_down,
                           scrub)
 from .gating import Limiter, is_addressed, is_allowed_location, split_message, strip_mention
 from .llm.base import Message, ProviderError
+from .sheets import SheetStore
 
 log = logging.getLogger("analecta.bot")
 
@@ -29,7 +31,8 @@ _NOT_ANSWERS = frozenset({CORRECT_USAGE, SAVED_CORRECTION, LOGGED_MISREAD, SAVE_
 
 class AnalectaBot(discord.Client):
     def __init__(self, *, agent: Agent, locations: Iterable[tuple[int, int]], limiter: Limiter,
-                 corrections: CorrectionStore | None = None, owner: str = ""):
+                 corrections: CorrectionStore | None = None, sheets: SheetStore | None = None, rng: object = None,
+                 owner: str = ""):
         intents = discord.Intents.none()
         intents.guilds = True
         intents.guild_messages = True
@@ -42,6 +45,23 @@ class AnalectaBot(discord.Client):
         self.corrections = corrections
         self.owner = owner
         self._slots = asyncio.Semaphore(2)
+        self.tree: AnalectaTree | None = None
+        if sheets is not None:  # slash commands: dice and character sheets, in the configured channels only
+            commands = DiceCommands(sheets, self.locations, rng)  # type: ignore[arg-type]
+            self.tree = AnalectaTree(self, commands)
+            register_commands(self.tree, commands)
+
+    async def setup_hook(self) -> None:
+        """Sync the slash commands to each configured server only (guild commands appear at once)."""
+        if self.tree is None:
+            return
+        for guild_id in sorted({guild_id for guild_id, _ in self.locations}):
+            guild = discord.Object(id=guild_id)
+            self.tree.copy_global_to(guild=guild)
+            try:
+                await self.tree.sync(guild=guild)
+            except discord.HTTPException as exc:
+                log.warning("could not sync slash commands to a configured server (HTTP %s)", getattr(exc, "status", "?"))
 
     async def on_ready(self) -> None:
         log.info("ready; watching %d configured channel(s)", len(self.locations))

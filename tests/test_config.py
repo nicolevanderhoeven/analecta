@@ -75,3 +75,17 @@ def test_some_channel_setting_required():
     with pytest.raises(ConfigError):
         load_settings({**LIST, "DISCORD_CHANNELS": "replace-with-pairs"})
     load_settings(LIST, need_discord=False)
+
+
+def test_sheet_settings():
+    s = load_settings(BASE)
+    assert str(s.sheets_dir) == "/var/lib/analecta/sheets" and s.sheets_gm_ids == frozenset()
+    s = load_settings({**BASE, "SHEETS_DIR": "/data/sheets", "SHEETS_GM_USER_IDS": "11, 22"})
+    assert str(s.sheets_dir) == "/data/sheets" and s.sheets_gm_ids == frozenset({11, 22})
+    assert load_settings({**BASE, "SHEETS_GM_USER_IDS": "replace-with-gm-user-id"}).sheets_gm_ids == frozenset()
+    with pytest.raises(ConfigError):
+        load_settings({**BASE, "SHEETS_GM_USER_IDS": "abc"})
+    with pytest.raises(ConfigError):
+        load_settings({**BASE, "SHEETS_DIR": "/tmp/n/sheets"})                                  # inside NOTES_DIR
+    with pytest.raises(ConfigError):
+        load_settings({**BASE, "CORRECTIONS_DIR": "/srv/c", "SHEETS_DIR": "/srv/c"})

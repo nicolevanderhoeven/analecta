@@ -1,0 +1,28 @@
+{
+  "success": true,
+  "build": {
+    "name": "Test Hero",
+    "class": "Cleric",
+    "level": 5,
+    "ancestry": "Human",
+    "heritage": "Versatile Heritage",
+    "background": "Scholar",
+    "alignment": "N",
+    "deity": "Not set",
+    "keyability": "wis",
+    "abilities": {"str": 10, "dex": 14, "con": 12, "int": 10, "wis": 18, "cha": 12},
+    "attributes": {"ancestryhp": 8, "classhp": 8, "bonushp": 0, "bonushpPerLevel": 0, "speed": 25, "speedBonus": 0},
+    "proficiencies": {
+      "classDC": 2, "perception": 2, "fortitude": 2, "reflex": 2, "will": 4,
+      "acrobatics": 0, "arcana": 0, "athletics": 2, "crafting": 0, "deception": 0, "diplomacy": 0,
+      "intimidation": 0, "medicine": 2, "nature": 0, "occultism": 0, "performance": 0, "religion": 4,
+      "society": 2, "stealth": 0, "survival": 0, "thievery": 0
+    },
+    "mods": {"Religion": {"Item Bonus": 1}, "Will": {"Resilient": 1}, "Stealth": {"Armor check penalty": -1, "Item Bonus": 1}},
+    "lores": [["Dwarven", 2], ["Guild", 4]],
+    "feats": [["Shield Block", null, "General Feat", 1], ["Assurance", "Religion", "Skill Feat", 2]],
+    "acTotal": {"acProfBonus": 7, "acAbilityBonus": 2, "acItemBonus": 1, "acTotal": 20, "shieldBonus": "2"},
+    "weapons": [], "armor": [], "equipment": [], "money": {"gp": 15}, "spellCasters": [],
+    "someFutureField": {"anything": [1, 2, 3]}
+  }
+}

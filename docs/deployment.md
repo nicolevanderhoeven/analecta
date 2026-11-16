@@ -63,6 +63,9 @@ into a terminal where they are echoed or logged. For the OpenAI key held in a lo
 Add the remaining lines (`DISCORD_CHANNELS` with the server and channel IDs, model, `NOTES_DIR=/srv/analecta/notes`,
 optionally `BOT_OWNER` (your name, shown in the help text and pinned note; unset means no name),
 optionally `CORRECTIONS_DIR` (default `/srv/analecta/corrections`; it must not be inside or around `NOTES_DIR`),
+optionally `SHEETS_DIR` (default `/var/lib/analecta/sheets`, where saved character sheets live; see
+[sheets.md](sheets.md). `setup-droplet.sh` creates it, and `deploy/analecta.service` lists it under `ReadWritePaths`, so
+edit that line too if you move it) and `SHEETS_GM_USER_IDS` (optional),
 the Discord token the same way)
 and then `chown root:analecta /etc/analecta/analecta.env && chmod 640 /etc/analecta/analecta.env`.
 
@@ -124,8 +127,11 @@ folder; Syncthing deletes it on the server and keeps a copy in `.stversions`. Pu
    intent is needed. Set the application's **Privacy Policy URL** to the public URL of `docs/privacy.md`
    (see [clearances.md](clearances.md)). Keep the bot private (not public, no listing).
 2. Create a **private** channel for the group. Give the bot role only: View Channel, Send Messages, Read Message
-   History. Invite the bot with scopes `bot` and no extra permissions. Anyone who can post in the channel may use
-   it; channel permissions are the access control.
+   History. Invite the bot with scopes `bot` and `applications.commands` and no extra permissions (`bot` already
+   includes the slash-command scope; writing both is harmless, and a re-invite is needed only if `/roll` does not
+   appear). Anyone who can post in the channel may use it; channel permissions are the access control. The slash
+   commands (`/roll`, `/sheet`, `/character`) are registered to each configured server only, and the bot refuses
+   them in any other channel with a private pointer to the right one.
 3. Put the server and channel IDs in the env file as `DISCORD_CHANNELS=<SERVER_ID>:<CHANNEL_ID>` (Discord Developer
    Mode, Copy ID). The older `DISCORD_GUILD_ID` plus `DISCORD_CHANNEL_ID` pair still works as one entry; `DISCORD_CHANNEL_ID` without
    `DISCORD_GUILD_ID` stops the bot at start.

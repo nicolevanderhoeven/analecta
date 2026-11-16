@@ -22,6 +22,17 @@ def is_allowed_location(message: Any, locations: Iterable[tuple[int, int]]) -> b
     )
 
 
+def is_allowed_interaction(interaction: Any, locations: Iterable[tuple[int, int]]) -> bool:
+    """The slash-command twin of is_allowed_location: a configured (server, channel) pair or a thread under one."""
+    guild_id = getattr(interaction, "guild_id", None)
+    if guild_id is None:
+        return False
+    channel = getattr(interaction, "channel", None)
+    ids = {getattr(interaction, "channel_id", None), getattr(channel, "id", None),
+           getattr(channel, "parent_id", None)} - {None}
+    return any(guild_id == g and c in ids for g, c in locations)
+
+
 def is_addressed(message: Any, bot_user_id: int) -> bool:
     """Answer only when mentioned or when replying to one of the bot's own messages."""
     if any(getattr(u, "id", None) == bot_user_id for u in getattr(message, "mentions", [])):
