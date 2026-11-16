@@ -54,8 +54,10 @@ notes. Which links it follows:
   those on a line about family, partners, allies or enemies come first.
 - Notes with another or no type, only from such a line.
 - Session notes, and notes typed `place`, `item`, `faction` and the like, not at all, unless the question names them.
-  An item or faction note linked on a family line is still followed when the link uses one of its aliases (a note
-  such as an armour whose alias is the person's name stands for that person).
+  An item or faction note linked on a family line is still followed when the link, or its display text after `|`,
+  is not the note's own title (a note such as an armour whose alias is the person's name stands for that person).
+- The asker's own character note is read up front when the question uses "my", "mine" or "myself", or when no other
+  note matched the question and it says "me" or "I".
 
 Answers that used it end with a `Notes read: ...` line built from the notes actually read. The notes marked as secrets
 are shared with all the players, so the bot repeats them. `ANALECTA_CHARACTER_MAP` holds Discord user IDs, so keep it
