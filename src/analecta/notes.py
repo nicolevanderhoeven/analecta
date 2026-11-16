@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import frontmatter
@@ -12,12 +12,64 @@ MAX_READ_CHARS = 14000
 MAX_GREP_LINES = 40
 LINE_CLIP = 320
 MAX_ENTITY_NOTES = 5
+NOTE_CUT = "\n[truncated; call read_note again with a later start_line]"
 MIN_ENTITY_NAME_CHARS = 3
+CHARS_PER_TOKEN = 4  # rough, for the link-following token cap
+
+# Note types (the frontmatter `type`) that are people, and the "hub" types that many notes link to.
+PERSON_TYPES = frozenset({"pc", "npc", "character", "person", "player", "player character", "ally", "villain"})
+PC_TYPES = frozenset({"pc", "player", "player character"})
+HUB_TYPES = frozenset({
+    "place", "location", "region", "city", "town", "settlement", "dungeon", "map", "item", "object", "artifact",
+    "equipment", "session", "faction", "organization", "organisation",
+})
+RELATION_RE = re.compile(
+    r"famil|parent|mother|father|\bmom\b|\bdad\b|child|\bkids?\b|\bson\b|daughter|sibling|brother|sister|spouse|"
+    r"husband|\bwife\b|married|marriage|partner|lover|betroth|fianc|\ball(?:y|ies)\b|\benem(?:y|ies)\b|rival|friend|"
+    r"relative|\bkin\b|descend|ancest|\bheirs?\b|cousin|uncle|aunt|niece|nephew|grand|bloodline|lineage|mentor|"
+    r"\bwards?\b|sworn|related", re.IGNORECASE)
+QUESTION_PEOPLE_RE = re.compile(RELATION_RE.pattern + r"|who (?:is|was|are|were)|relationship|connected|know", re.IGNORECASE)
+FIRST_PERSON_RE = re.compile(r"(?<![\w'])(?:my|me|mine|myself|i)(?![\w])", re.IGNORECASE)
+WIKILINK_RE = re.compile(r"(?<!!)\[\[([^\]\[|#\n]+)(?:#[^\]|\n]*)?(?:\|([^\]\n]*))?\]\]")
 DIGEST_CHAR_BUDGET = 40000  # roughly 10K tokens
+
+
+@dataclass(frozen=True)
+class LinkPolicy:
+    """Limits for following [[wikilinks]] between notes. depth 0 turns link-following off."""
+    depth: int = 2
+    max_notes: int = 12
+    token_cap: int = 32000
+
+    @property
+    def max_chars(self) -> int:
+        return self.token_cap * CHARS_PER_TOKEN
+
+
+MAX_LINK_DEPTH = 3
 
 
 class NotesError(ValueError):
     """A tool call that cannot be served; the message is shown to the model."""
+
+
+@dataclass
+class LinkedNote:
+    info: "NoteInfo"
+    depth: int  # 0 for the notes the question names
+    via: str  # title of the note whose link led here ("" for depth 0)
+    text: str = ""  # what read() returned, cut to fit the budget
+
+
+@dataclass
+class LinkTrail:
+    notes: list[LinkedNote] = field(default_factory=list)
+    skipped_hubs: list[str] = field(default_factory=list)
+    over_budget: list[str] = field(default_factory=list)
+
+    @property
+    def followed(self) -> list[LinkedNote]:
+        return [n for n in self.notes if n.depth > 0]
 
 
 @dataclass(frozen=True)
@@ -31,6 +83,17 @@ class NoteInfo:
     @property
     def is_session(self) -> bool:
         return self.session_number is not None
+
+    @property
+    def note_type(self) -> str:
+        value = self.meta.get("type")
+        return value.strip().lower() if isinstance(value, str) else ""
+
+    @property
+    def names(self) -> list[str]:
+        aliases = self.meta.get("aliases")
+        extra = aliases if isinstance(aliases, list) else ([aliases] if isinstance(aliases, str) else [])
+        return [self.title, *[a for a in extra if a.strip()]]
 
     @property
     def one_liner(self) -> str:
@@ -226,6 +289,107 @@ class NotesStore:
             found.append((m.start(), info))
         found.sort(key=lambda f: f[0])
         return [f[1] for f in found[:limit]]
+
+    # -- people and links --------------------------------------------------------------
+    def _name_index(self, infos: list[NoteInfo] | None = None) -> dict[str, NoteInfo]:
+        index: dict[str, NoteInfo] = {}
+        for info in infos if infos is not None else self.infos():
+            for name in info.names:
+                index.setdefault(name.strip().lower(), info)
+        return index
+
+    def find_character(self, display_names: list[str], override: str = "") -> NoteInfo | None:
+        """The player character a Discord member plays: `override` (a note name or alias, from the operator's map)
+        if it names a note, else the first display name that equals a PC note's title or alias (case-insensitive)."""
+        infos = self.infos()
+        if override.strip():
+            hit = self._name_index(infos).get(override.strip().lower())
+            if hit is not None and not hit.is_session:
+                return hit
+        pcs = self._name_index([i for i in infos if not i.is_session and i.note_type in PC_TYPES])
+        for name in display_names:
+            hit = pcs.get(" ".join(str(name).split()).lower())
+            if hit is not None:
+                return hit
+        return None
+
+    def follow_links(self, seeds: list[NoteInfo], question: str, policy: LinkPolicy, *,
+                     seed_chars_used: int = 0, per_note_chars: int = 12000) -> LinkTrail:
+        """Breadth-first walk of [[wikilinks]] from `seeds`, nearest notes first, within `policy`.
+
+        Followed: person notes, and links on lines about family, partners, allies or enemies. Skipped: session notes
+        and places, items, factions (hubs) unless the question names them; an item or faction linked on a family
+        line is still followed when the link goes through one of its aliases (the note stands for a person). Stops
+        when a step finds nothing new, at the depth, at `max_notes` notes in all or at the character budget.
+        Seeds are not read here; only the linked notes (depth > 0) carry text.
+        """
+        depth = max(0, min(policy.depth, MAX_LINK_DEPTH))
+        trail = LinkTrail()
+        infos = self.infos()
+        by_name = self._name_index(infos)
+        visited = {s.path for s in seeds}
+        trail.notes = [LinkedNote(s, 0, "") for s in seeds]
+        used = seed_chars_used
+        frontier = list(seeds)
+        asked = question.lower()
+        for level in range(1, depth + 1):
+            found: list[tuple[int, int, NoteInfo, str]] = []  # (priority, order, target, via title)
+            for src in frontier:
+                try:
+                    lines = self._resolve(src.path).read_text(encoding="utf-8", errors="replace").split("\n")
+                except (NotesError, OSError):
+                    continue
+                for line in lines:
+                    for m in WIKILINK_RE.finditer(line):
+                        target_name = m.group(1).strip().rsplit("/", 1)[-1].strip()
+                        target = by_name.get(target_name.lower())
+                        if target is None or target.path in visited or any(f[2].path == target.path for f in found):
+                            continue
+                        verdict = self._link_verdict(target, target_name, line, asked)
+                        if verdict is None:
+                            if target.title not in trail.skipped_hubs:
+                                trail.skipped_hubs.append(target.title)
+                            continue
+                        found.append((verdict, len(found), target, src.title))
+            if not found:
+                break
+            found.sort(key=lambda f: (f[0], f[1]))
+            frontier = []
+            for _, _, target, via in found:
+                if len(trail.notes) >= policy.max_notes or used >= policy.max_chars - 400:
+                    trail.over_budget.append(target.title)
+                    continue
+                try:
+                    text = self.read(target.path, 1, 400)
+                except (NotesError, OSError):
+                    continue
+                limit = min(per_note_chars, policy.max_chars - used)
+                if len(text) > limit:
+                    text = text[: max(0, limit - len(NOTE_CUT))] + NOTE_CUT
+                used += len(text)
+                visited.add(target.path)
+                trail.notes.append(LinkedNote(target, level, via, text))
+                frontier.append(target)
+        trail.skipped_hubs = [h for h in trail.skipped_hubs if h not in {n.info.title for n in trail.notes}]
+        return trail
+
+    @staticmethod
+    def _link_verdict(target: NoteInfo, written: str, line: str, asked: str) -> int | None:
+        """0 = follow first (person on a family line), 1 = follow (person elsewhere), 2 = follow last (other note on a
+        family line), None = skip."""
+        relation = bool(RELATION_RE.search(line))
+        kind = target.note_type
+        if target.is_session:
+            return None if target.title.lower() not in asked else 1
+        if kind in PERSON_TYPES:
+            return 0 if relation else 1
+        if any(n.strip().lower() in asked for n in target.names if len(n.strip()) >= MIN_ENTITY_NAME_CHARS):
+            return 1  # the question names it, so it is not an incidental hub
+        if kind in HUB_TYPES:
+            stands_for_person = written.strip().lower() != target.title.lower()
+            return 2 if relation and stands_for_person and kind not in {"place", "location", "region", "city", "town",
+                                                                      "settlement", "dungeon", "map"} else None
+        return 2 if relation else None
 
     # -- digest ------------------------------------------------------------------
     def digest(self, budget_chars: int = DIGEST_CHAR_BUDGET) -> str:

@@ -29,10 +29,11 @@ def _clear_messages():
 
 class FakeAgent:
     def __init__(self, text="the answer", error=None):
-        self.text, self.error, self.calls = text, error, []
+        self.text, self.error, self.calls, self.askers = text, error, [], []
 
-    async def answer(self, history):
+    async def answer(self, history, asker=None):
         self.calls.append(history)
+        self.askers.append(asker)
         if self.error:
             raise self.error
         return AgentResult(text=self.text)
@@ -71,6 +72,15 @@ def make_msg(content="<@7> who is Old Quill?", *, channel=CHANNEL, guild=GUILD, 
     if msg_id > 1:
         MESSAGES[msg_id] = msg
     return msg
+
+
+def test_agent_is_told_the_names_the_asker_appears_under():
+    agent = FakeAgent()
+    msg = make_msg(author=77)
+    msg.author.nick, msg.author.global_name, msg.author.name = "Ilsa", "Dana G", "dana"
+    run(make_bot(agent), msg)
+    asker = agent.askers[0]
+    assert asker.user_id == 77 and asker.names == ("Ilsa", "Alex", "Dana G", "dana")
 
 
 def run(bot, msg):
