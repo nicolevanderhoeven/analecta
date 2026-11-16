@@ -23,6 +23,7 @@ SVC_USER=analecta
 APP_DIR=/opt/analecta
 NOTES_DIR=/srv/analecta/notes
 CORRECTIONS_DIR=/srv/analecta/corrections
+SHEETS_DIR=/var/lib/analecta/sheets
 ENV_DIR=/etc/analecta
 
 [ "$(id -u)" -eq 0 ] || { echo "Run as root." >&2; exit 1; }
@@ -45,6 +46,7 @@ echo "== service user and folders"
 id "$SVC_USER" >/dev/null 2>&1 || useradd --system --create-home --home-dir "/home/$SVC_USER" --shell /usr/sbin/nologin "$SVC_USER"
 install -d -o "$SVC_USER" -g "$SVC_USER" -m 750 "$NOTES_DIR"
 install -d -o "$SVC_USER" -g "$SVC_USER" -m 750 "$CORRECTIONS_DIR"   # the bot writes here; Syncthing sends it to the Mac
+install -d -o "$SVC_USER" -g "$SVC_USER" -m 750 "$(dirname "$SHEETS_DIR")" "$SHEETS_DIR"   # character sheets: not synced anywhere
 install -d -o root -g "$SVC_USER" -m 750 "$ENV_DIR"
 
 echo "== firewall: SSH and Syncthing sync only"

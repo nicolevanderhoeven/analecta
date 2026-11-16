@@ -39,6 +39,11 @@ Not published, endorsed, or specifically approved by Paizo.
   `ANALECTA_CHARACTER_MAP` maps Discord user IDs to character notes for members whose names do not match.
 - **Rules come live from Archives of Nethys** through the site's own search backend, with a link to the exact page,
   a short cache, a low request rate, a back-off on failures and a switch to turn it off (`AON_ENABLED=false`).
+- **Dice and character sheets.** Slash commands in the same channel: `/roll 1d20+5` for plain dice, and
+  `/roll Religion -2` for a skill, save, Perception or Lore from a character sheet the player imported with
+  `/sheet add` (a Pathbuilder 2e JSON file), plus an extra modifier. Each player is registered to a character
+  (`/character register`), so a roll uses their own by default, and anyone can roll for another character with
+  `character:`. Plain code, no language model: sheets are never sent to OpenAI. See [docs/sheets.md](docs/sheets.md).
 - **The group can correct it.** Reply to an answer with `/correct <the fix>` and it is saved as a *table correction*
   (with who and when) in `corrections.md`; later answers use those ahead of the notes and say so. A 👎 on an answer,
   or a reply saying "wrong", logs the question and answer to a review list, `misreads.md`. Both live outside the
@@ -70,6 +75,7 @@ address, real names and the real notes never enter it.
 - [docs/setup-from-scratch.md](docs/setup-from-scratch.md): the start-to-finish guide for a new owner: scope and cost,
   notes format, Syncthing on the Mac, creating the droplet and the Discord application.
 - [docs/deployment.md](docs/deployment.md): droplet, Syncthing (notes out, corrections back), Mac export job, Discord setup, go-live checklist.
+- [docs/sheets.md](docs/sheets.md): dice and character sheets: how a player adds a sheet, the commands, permissions, storage.
 - [docs/clearances.md](docs/clearances.md): Discord, OpenAI and ORC checks, with sources.
 - [docs/pinned-note.md](docs/pinned-note.md): the help text and the pinned note.
 - [docs/privacy.md](docs/privacy.md): the privacy policy for the group.

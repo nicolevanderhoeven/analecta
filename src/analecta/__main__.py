@@ -32,6 +32,7 @@ def main(argv: list[str] | None = None) -> int:
     from .gating import Limiter
     from .llm import make_provider
     from .notes import NotesStore
+    from .sheets import SheetStore
     from .prompts import build_system_prompt
 
     notes = NotesStore(settings.notes_dir)
@@ -50,12 +51,19 @@ def main(argv: list[str] | None = None) -> int:
     except OSError:
         print(f"Warning: cannot create the corrections folder {settings.corrections_dir}; "
               "saving corrections and flags will fail until it exists and is writable.", file=sys.stderr)
+    sheets = SheetStore(settings.sheets_dir, settings.sheets_gm_ids)
+    try:
+        settings.sheets_dir.mkdir(parents=True, exist_ok=True, mode=0o750)
+    except OSError:
+        print(f"Warning: cannot create the sheets folder {settings.sheets_dir}; "
+              "saving character sheets will fail until it exists and is writable.", file=sys.stderr)
     agent = Agent(make_provider(settings), notes, aon, partial(build_system_prompt, owner=settings.bot_owner),
                   settings.max_tool_turns, corrections=corrections, links=settings.links,
-                  character_map=settings.character_map)
+                  character_map=settings.character_map, registered_character=sheets.character_name_for)
     bot = AnalectaBot(
         agent=agent,
         corrections=corrections,
+        sheets=sheets,
         locations=settings.channels,
         limiter=Limiter(settings.user_cooldown, settings.daily_limit),
         owner=settings.bot_owner,

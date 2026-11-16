@@ -78,6 +78,11 @@ def parse_character_map(raw: str) -> dict[int, str]:
     return out
 
 
+def parse_user_ids(raw: str, what: str) -> frozenset[int]:
+    """Parse a comma-separated list of Discord user ids."""
+    return frozenset(_snowflake(entry, what) for entry in raw.split(",") if entry.strip())
+
+
 @dataclass(frozen=True)
 class Settings:
     discord_token: str
@@ -98,9 +103,12 @@ class Settings:
     bot_owner: str = ""
     links: LinkPolicy = LinkPolicy()
     character_map: dict[int, str] = field(default_factory=dict)
+    sheets_dir: Path = Path("/var/lib/analecta/sheets")
+    sheets_gm_ids: frozenset[int] = frozenset()
 
 
 DEFAULT_CORRECTIONS_DIR = "/srv/analecta/corrections"
+DEFAULT_SHEETS_DIR = "/var/lib/analecta/sheets"
 
 
 def _overlaps(a: Path, b: Path) -> bool:
@@ -165,6 +173,12 @@ def load_settings(env: dict[str, str] | None = None, *, need_discord: bool = Tru
     if _overlaps(notes_dir, corrections_dir):
         raise ConfigError("CORRECTIONS_DIR must be a separate folder from NOTES_DIR (the notes are read-only)")
 
+    sheets_dir = Path(env.get("SHEETS_DIR", "").strip() or DEFAULT_SHEETS_DIR).expanduser()
+    if _overlaps(notes_dir, sheets_dir) or _overlaps(corrections_dir, sheets_dir):
+        raise ConfigError("SHEETS_DIR must be a separate folder from NOTES_DIR and CORRECTIONS_DIR")
+    gm_raw = env.get("SHEETS_GM_USER_IDS", "").strip()
+    gm_ids = parse_user_ids("" if gm_raw.startswith("replace-with") else gm_raw, "SHEETS_GM_USER_IDS entry")
+
     return Settings(
         discord_token=token,
         channels=tuple(channels),
@@ -188,4 +202,6 @@ def load_settings(env: dict[str, str] | None = None, *, need_discord: bool = Tru
             token_cap=max(1000, _int(env, "LINK_TOKEN_CAP", 32000)),
         ),
         character_map=parse_character_map(env.get("ANALECTA_CHARACTER_MAP", "")),
+        sheets_dir=sheets_dir,
+        sheets_gm_ids=gm_ids,
     )

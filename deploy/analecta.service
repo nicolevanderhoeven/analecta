@@ -15,7 +15,8 @@ Restart=on-failure
 RestartSec=10
 RestartPreventExitStatus=2
 
-# Hardening: the bot needs outbound network, read access to the notes, and write access to its corrections folder.
+# Hardening: the bot needs outbound network, read access to the notes, and write access to its corrections and
+# character sheets folders.
 NoNewPrivileges=true
 PrivateTmp=true
 PrivateDevices=true
@@ -32,7 +33,7 @@ CapabilityBoundingSet=
 AmbientCapabilities=
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 ReadOnlyPaths=/srv/analecta/notes
-ReadWritePaths=/srv/analecta/corrections
+ReadWritePaths=/srv/analecta/corrections /var/lib/analecta/sheets
 InaccessiblePaths=/home /root
 
 [Install]

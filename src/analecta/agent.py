@@ -83,13 +83,15 @@ class Agent:
     def __init__(self, provider: LLMProvider, notes: NotesStore, aon: AonClient,
                  system_builder: Callable[[str], str], max_turns: int = 8,
                  corrections: CorrectionStore | None = None, links: LinkPolicy | None = None,
-                 character_map: dict[int, str] | None = None):
+                 character_map: dict[int, str] | None = None,
+                 registered_character: Callable[[int], str | None] | None = None):
         self.provider = provider
         self.notes = notes
         self.corrections = corrections
         self.aon = aon
         self.links = links if links is not None else LinkPolicy()
         self.character_map = dict(character_map or {})
+        self.registered_character = registered_character  # the registration store: tried before the env map
         self.max_turns = max_turns
         self._system_builder = system_builder
         self._system = ""
@@ -134,11 +136,25 @@ class Agent:
         return out
 
     def asker_character(self, asker: Asker | None) -> NoteInfo | None:
+        """The note of the character the asker plays: their registration first, then the operator's env map, then
+        a display name that equals a player-character note."""
         if asker is None:
             return None
-        override = self.character_map.get(asker.user_id, "") if asker.user_id is not None else ""
+        overrides: list[str] = []
+        if asker.user_id is not None:
+            if self.registered_character is not None:
+                try:
+                    overrides.append(self.registered_character(asker.user_id) or "")
+                except OSError:
+                    pass
+            overrides.append(self.character_map.get(asker.user_id, ""))
         try:
-            return self.notes.find_character(list(asker.names), override)
+            for override in overrides:
+                if override.strip():
+                    hit = self.notes.find_character([], override)
+                    if hit is not None:
+                        return hit
+            return self.notes.find_character(list(asker.names))
         except OSError:
             return None
 
