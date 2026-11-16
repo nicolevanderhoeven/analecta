@@ -61,6 +61,7 @@ into a terminal where they are echoed or logged. For the OpenAI key held in a lo
 ```
 
 Add the remaining lines (`DISCORD_CHANNELS` with the server and channel IDs, model, `NOTES_DIR=/srv/analecta/notes`,
+optionally `BOT_OWNER` (your name, shown in the help text and pinned note; unset means no name),
 optionally `CORRECTIONS_DIR` (default `/srv/analecta/corrections`; it must not be inside or around `NOTES_DIR`),
 the Discord token the same way)
 and then `chown root:analecta /etc/analecta/analecta.env && chmod 640 /etc/analecta/analecta.env`.

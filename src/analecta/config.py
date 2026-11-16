@@ -79,6 +79,7 @@ class Settings:
     aon_user_agent: str
     user_cooldown: float
     daily_limit: int
+    bot_owner: str = ""
 
 
 DEFAULT_CORRECTIONS_DIR = "/srv/analecta/corrections"
@@ -162,4 +163,5 @@ def load_settings(env: dict[str, str] | None = None, *, need_discord: bool = Tru
         aon_user_agent=env.get("AON_USER_AGENT", "analecta-discord-bot").strip(),
         user_cooldown=_float(env, "USER_COOLDOWN_SECONDS", 20.0),
         daily_limit=_int(env, "DAILY_QUESTION_LIMIT", 150),
+        bot_owner=env.get("BOT_OWNER", "").strip(),
     )

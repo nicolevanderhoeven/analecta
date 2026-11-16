@@ -28,3 +28,29 @@ def test_notice_fits_discord_in_few_messages():
 def test_system_prompt_includes_digest_and_help():
     p = build_system_prompt("DIGEST-MARKER")
     assert "DIGEST-MARKER" in p and "Archives of Nethys" in p and "{" not in p.replace("{}", "")
+
+
+def test_owner_unset_keeps_wording():
+    from analecta.clearances import help_notice, pinned_note
+
+    assert pinned_note() == PINNED_NOTE and pinned_note("  ") == PINNED_NOTE
+    assert help_notice() == HELP_NOTICE and "run by" not in HELP_NOTICE
+
+
+def test_owner_set_is_named_in_help_pinned_note_and_prompt():
+    from analecta.clearances import help_notice, pinned_note
+
+    assert "Analecta is run by Ada Lovelace." in help_notice("Ada Lovelace")
+    note = pinned_note("Ada Lovelace")
+    assert note.rstrip().endswith("tell its owner, Ada Lovelace._") and "Analecta is run by Ada Lovelace." in note
+    assert "run by Ada Lovelace" in build_system_prompt("D", owner="Ada Lovelace")
+    assert "run by" not in build_system_prompt("D")
+    assert 1 <= len(split_message(note)) <= 2
+
+
+def test_bot_owner_setting(monkeypatch):
+    from analecta.config import load_settings
+
+    base = {"DISCORD_TOKEN": "t", "DISCORD_CHANNELS": "1:2", "OPENAI_API_KEY": "k", "NOTES_DIR": "/tmp/n"}
+    assert load_settings(base).bot_owner == ""
+    assert load_settings({**base, "BOT_OWNER": " Ada Lovelace "}).bot_owner == "Ada Lovelace"

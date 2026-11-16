@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from functools import partial
 
 from .config import ConfigError, load_env_file, load_settings
 
@@ -11,9 +12,10 @@ from .config import ConfigError, load_env_file, load_settings
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if argv[:1] == ["pinned"]:
-        from .clearances import PINNED_NOTE
+        from .clearances import pinned_note
 
-        print(PINNED_NOTE)
+        load_env_file(os.environ.get("ANALECTA_ENV_FILE", ".env"))
+        print(pinned_note(os.environ.get("BOT_OWNER", "")))
         return 0
     load_env_file(os.environ.get("ANALECTA_ENV_FILE", ".env"))
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -48,13 +50,14 @@ def main(argv: list[str] | None = None) -> int:
     except OSError:
         print(f"Warning: cannot create the corrections folder {settings.corrections_dir}; "
               "saving corrections and flags will fail until it exists and is writable.", file=sys.stderr)
-    agent = Agent(make_provider(settings), notes, aon, build_system_prompt, settings.max_tool_turns,
+    agent = Agent(make_provider(settings), notes, aon, partial(build_system_prompt, owner=settings.bot_owner), settings.max_tool_turns,
                   corrections=corrections)
     bot = AnalectaBot(
         agent=agent,
         corrections=corrections,
         locations=settings.channels,
         limiter=Limiter(settings.user_cooldown, settings.daily_limit),
+        owner=settings.bot_owner,
     )
     bot.run(settings.discord_token, log_handler=None)
     return 0

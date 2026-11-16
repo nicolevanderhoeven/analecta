@@ -331,7 +331,8 @@ Each of these is spelled out in [deployment.md](deployment.md); do them in this 
 2. **The env file.** Create `/etc/analecta/analecta.env` from [`.env.example`](../.env.example) as described in
    [deployment.md, The env file](deployment.md#the-env-file-secrets-live-only-here). The values you collected:
    `DISCORD_TOKEN` (step 6), `DISCORD_CHANNELS` (step 6), `OPENAI_API_KEY` (step 7). `NOTES_DIR=/srv/analecta/notes` is
-   already the default. Do not type secrets into a terminal where they would be logged.
+   already the default. Optionally set `BOT_OWNER=<your name>` so the help text and pinned note say who runs the bot
+   (run `python -m analecta pinned` to print the note with it). Do not type secrets into a terminal where they would be logged.
 3. **Syncthing pairing.** On the droplet run `deploy/configure-syncthing.sh` with `MAC_DEVICE_ID` (step 4), note the
    droplet's device ID it prints, then add the droplet and the `analecta-notes` folder on the Mac and accept the
    corrections folder, all as in [deployment.md section 3](deployment.md#3-syncthing).

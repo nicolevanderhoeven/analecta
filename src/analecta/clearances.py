@@ -30,3 +30,17 @@ HELP_NOTICE = """\
 """.format(paizo=PAIZO_NOTICE, orc=ORC_NOTICE)
 
 PINNED_NOTE = HELP_NOTICE + "\n_Questions about Analecta: ask in this channel or tell its owner._"
+
+
+def help_notice(owner: str = "") -> str:
+    """The help text; with an owner name set (BOT_OWNER) it also says who runs the bot."""
+    owner = owner.strip()
+    return HELP_NOTICE + (f"\n**Who runs it:** Analecta is run by {owner}.\n" if owner else "")
+
+
+def pinned_note(owner: str = "") -> str:
+    """The pinned note; with an owner name set it names the owner in the closing line."""
+    owner = owner.strip()
+    if not owner:
+        return PINNED_NOTE
+    return help_notice(owner) + f"\n_Questions about Analecta: ask in this channel or tell its owner, {owner}._"
