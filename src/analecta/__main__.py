@@ -50,8 +50,8 @@ def main(argv: list[str] | None = None) -> int:
     except OSError:
         print(f"Warning: cannot create the corrections folder {settings.corrections_dir}; "
               "saving corrections and flags will fail until it exists and is writable.", file=sys.stderr)
-    agent = Agent(make_provider(settings), notes, aon, partial(build_system_prompt, owner=settings.bot_owner), settings.max_tool_turns,
-                  corrections=corrections)
+    agent = Agent(make_provider(settings), notes, aon, partial(build_system_prompt, owner=settings.bot_owner),
+                  settings.max_tool_turns, corrections=corrections)
     bot = AnalectaBot(
         agent=agent,
         corrections=corrections,
