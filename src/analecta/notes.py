@@ -30,6 +30,7 @@ RELATION_RE = re.compile(
     r"\bwards?\b|sworn|related", re.IGNORECASE)
 QUESTION_PEOPLE_RE = re.compile(RELATION_RE.pattern + r"|who (?:is|was|are|were)|relationship|connected|know", re.IGNORECASE)
 FIRST_PERSON_RE = re.compile(r"(?<![\w'])(?:my|me|mine|myself|i)(?![\w])", re.IGNORECASE)
+OWNERSHIP_RE = re.compile(r"(?<![\w'])(?:my|mine|myself)(?![\w])", re.IGNORECASE)
 WIKILINK_RE = re.compile(r"(?<!!)\[\[([^\]\[|#\n]+)(?:#[^\]|\n]*)?(?:\|([^\]\n]*))?\]\]")
 DIGEST_CHAR_BUDGET = 40000  # roughly 10K tokens
 
@@ -345,7 +346,8 @@ class NotesStore:
                         target = by_name.get(target_name.lower())
                         if target is None or target.path in visited or any(f[2].path == target.path for f in found):
                             continue
-                        verdict = self._link_verdict(target, target_name, line, asked)
+                        shown = (m.group(2) or "").strip()
+                        verdict = self._link_verdict(target, (target_name, shown), line, asked)
                         if verdict is None:
                             if target.title not in trail.skipped_hubs:
                                 trail.skipped_hubs.append(target.title)
@@ -374,7 +376,7 @@ class NotesStore:
         return trail
 
     @staticmethod
-    def _link_verdict(target: NoteInfo, written: str, line: str, asked: str) -> int | None:
+    def _link_verdict(target: NoteInfo, written: tuple[str, ...], line: str, asked: str) -> int | None:
         """0 = follow first (person on a family line), 1 = follow (person elsewhere), 2 = follow last (other note on a
         family line), None = skip."""
         relation = bool(RELATION_RE.search(line))
@@ -386,7 +388,7 @@ class NotesStore:
         if any(n.strip().lower() in asked for n in target.names if len(n.strip()) >= MIN_ENTITY_NAME_CHARS):
             return 1  # the question names it, so it is not an incidental hub
         if kind in HUB_TYPES:
-            stands_for_person = written.strip().lower() != target.title.lower()
+            stands_for_person = any(w.strip() and w.strip().lower() != target.title.lower() for w in written)
             return 2 if relation and stands_for_person and kind not in {"place", "location", "region", "city", "town",
                                                                       "settlement", "dungeon", "map"} else None
         return 2 if relation else None

@@ -9,7 +9,7 @@ from typing import Any, Awaitable, Callable
 from .aon import AonClient
 from .corrections import CorrectionStore
 from .llm.base import LLMProvider, Message, ModelTurn, ToolCall, ToolSpec, Usage
-from .notes import FIRST_PERSON_RE, QUESTION_PEOPLE_RE, LinkPolicy, NoteInfo, NotesError, NotesStore
+from .notes import FIRST_PERSON_RE, OWNERSHIP_RE, QUESTION_PEOPLE_RE, LinkPolicy, NoteInfo, NotesError, NotesStore
 
 log = logging.getLogger("analecta.agent")
 
@@ -170,7 +170,7 @@ class Agent:
             outputs.append(Message(role="tool", tool_call_id=call.id, text=(
                 f"The person asking plays the player character {character.title} (note {character.path}). When they "
                 f"say my, me or I, they mean {character.title}, unless they name someone else.")))
-            if FIRST_PERSON_RE.search(question) and all(i.path != character.path for i in infos):
+            if (OWNERSHIP_RE.search(question) or (not infos and FIRST_PERSON_RE.search(question))) and all(i.path != character.path for i in infos):
                 infos.insert(0, character)
         budget = MAX_PREREAD_CHARS
         seeds: list[NoteInfo] = []

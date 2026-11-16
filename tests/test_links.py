@@ -152,3 +152,21 @@ def test_config_defaults_env_overrides_and_character_map():
         parse_character_map("abc:Name")
     with pytest.raises(ConfigError):
         parse_character_map("123")
+
+
+def test_display_text_alias_counts_as_standing_for_a_person(tmp_path):
+    (tmp_path / "Vayle.md").write_text("---\ntype: pc\n---\nHer partner is [[Graveknight Armor|Sythra]].\n")
+    (tmp_path / "Graveknight Armor.md").write_text("---\ntype: item\naliases: [Sythra]\n---\nSythra, a spirit.\n")
+    store = NotesStore(tmp_path)
+    infos = {i.title: i for i in store.infos()}
+    trail = store.follow_links([infos["Vayle"]], "Who is Vayle's family?", LinkPolicy())
+    assert "Graveknight Armor" in titles(trail)
+
+
+def test_asker_character_seeded_only_for_ownership_or_no_entity_match():
+    agent, prov = make_agent()
+    asyncio.run(agent.answer([Message("user", "Tell me about Brann Vesk's family")], Asker(5, ("ilsa",))))
+    assert "preread1" in tool_texts(prov) and "# Ilsa Marrow.md" not in tool_texts(prov)["preread1"]
+    agent, prov = make_agent()
+    asyncio.run(agent.answer([Message("user", "family of me")], Asker(5, ("ilsa",))))
+    assert "# Ilsa Marrow.md" in tool_texts(prov)["preread1"]
