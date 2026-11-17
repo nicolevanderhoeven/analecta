@@ -88,6 +88,15 @@ Implement `analecta.llm.base.LLMProvider` (one `step` method: system prompt, neu
 and tool calls out), register it in `analecta/llm/__init__.py`, and select it with `LLM_PROVIDER`. The agent loop
 and the tools do not change.
 
+## Managing GMs
+
+GMs may update, export and delete anyone's character sheet (see [sheets.md](sheets.md#who-may-do-what)). They come from
+two places: `SHEETS_GM_USER_IDS` in the env file, and `/gm add` in Discord. Only the bot's owner (the owner of the
+bot's application in the Discord developer portal; for a team, the team's owner) can add or remove GMs from Discord,
+and `/gm list` shows everyone. Added GMs are kept in `gms.json` inside `SHEETS_DIR`, next to the sheets, so they survive
+restarts and are included wherever you back that folder up. To drop a GM listed in the env file, edit the env file
+and restart the bot; `/gm remove` cannot. To remove an added GM by hand, delete their ID from `gms.json`.
+
 ## Evaluating a model
 
 `scripts/eval_questions.py` runs a private question list through the agent and prints aggregate results only. Keep

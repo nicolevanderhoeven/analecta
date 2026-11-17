@@ -34,6 +34,9 @@ sheet; the last 10 uploads are kept. `/sheet help` shows these steps in Discord.
 | `/companion add character: name: kind:eidolon str: dex: con: int: wis: cha: [ac:]` | Attach an eidolon to a character (owner or GM). Giving an existing name updates it. |
 | `/companion show [character]` | A companion's modifiers and the saves, Perception and skills it gets. `character` may be the character or the companion's name. |
 | `/companion remove [character] [name]` | Remove a companion (owner or GM). |
+| `/gm list` | Who the GMs are (anyone may ask). GMs from the env file are marked as such. |
+| `/gm add user:` | Make a member a GM. The bot's owner only. |
+| `/gm remove user:` | Stop a member being a GM. The bot's owner only; a GM set in the env file is not removed by it. |
 | `/roll ... companion:True` | Roll as your own character's companion (`character:Ash` does the same by name). |
 
 Adding your first sheet registers you to it automatically. With a registered character you never need to name one:
@@ -77,8 +80,11 @@ modifier (`/roll Athletics -1`). Variant rules such as proficiency without level
 ## Who may do what
 
 - Anyone in the channel can roll for, and view, any saved character.
-- A sheet's **owner** (whoever added it) and the Discord user IDs in `SHEETS_GM_USER_IDS` may update, export and delete
-  it, and register other players to it.
+- A sheet's **owner** (whoever added it) and the **GMs** may update, export and delete it, and register other players to
+  it. A GM is anyone whose Discord user ID is in `SHEETS_GM_USER_IDS`, or who was added with `/gm add`.
+- Only the bot's owner (the owner of the bot's application in the Discord developer portal; for a team, the team's
+  owner) can use `/gm add` and `/gm remove`. Anyone can use `/gm list`. All three reply privately. GMs from the env file
+  cannot be removed by `/gm remove`: edit the env file and restart the bot.
 - Anyone may register themselves to a character nobody else holds. Taking a character someone else holds needs the
   owner or a GM.
 - Two characters cannot share a name (case-insensitive). Uploading a name that belongs to someone else is refused.
@@ -88,7 +94,7 @@ modifier (`/roll Athletics -1`). Variant rules such as proficiency without level
 Plain JSON files under `SHEETS_DIR` (default `/var/lib/analecta/sheets`), outside the repository and outside the
 notes and corrections folders: one folder per character with the owner's Discord ID, the character's name, and
 the last 10 uploaded files untouched, a `companions` folder with each companion (name, kind, ability modifiers, optional
-AC) versioned the same way, plus `registrations.json` (which Discord user plays which character). The
+AC) versioned the same way, plus `registrations.json` (which Discord user plays which character) and `gms.json` (the user IDs added with `/gm add`). The
 folder is mode 750 and readable only by the bot's service account. Nothing about a sheet is logged. The bot is the only
 reader: the same registration file tells the notes link-follower which note is a member's character (it passes
 only the character's name to find the note, not the sheet). Backing the folder up is up to the person running the bot.

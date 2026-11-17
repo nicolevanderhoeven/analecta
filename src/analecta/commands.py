@@ -1,5 +1,5 @@
 """Slash commands for dice and character sheets: /roll, /sheet (add, show, export, delete, help), /character
-(register, list, unregister) and /companion (add, show, remove).
+(register, list, unregister), /companion (add, show, remove) and /gm (add, remove, list).
 
 `DiceCommands` holds the behaviour as plain async methods so tests can call them with a fake interaction;
 `register_commands` wraps them as discord.py application commands. Sheet data is never logged and never sent to a
@@ -10,7 +10,7 @@ from __future__ import annotations
 import io
 import logging
 import re
-from collections.abc import Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from typing import Any
 
 import discord
@@ -36,6 +36,7 @@ SHEET_HELP = f"""\
 **Rolling:** `/roll 1d20+5` for plain dice. `/roll Religion -2` rolls your Religion skill plus an extra modifier (skills, saves, Perception and Lores work). Add `character:` to roll for someone else's character, and `secret:` to see the result only yourself.
 **Companions:** an eidolon has no sheet of its own. `/companion add` attaches one to a character with its six ability modifiers; its saves, Perception and skills then use the summoner's proficiency and item bonuses. Roll for it with `/roll Athletics character:Ash`, or `companion:True` for your own character's. `/companion show` and `/companion remove` do the rest.
 **Your character:** adding a sheet registers you to it if you have none. `/character register` links you to a different one (or links another player, if you own the sheet or are a GM); `/character list` shows who is who.
+**GMs:** they may update, export and delete anyone's sheet. `/gm list` shows them; only my owner adds or removes one.
 **Keeping it:** I save your sheet file on my server and keep your last {MAX_VERSIONS} uploads, so re-adding the same character updates it. `/sheet export` gives you the file back (this is a copy of the export, not something Pathbuilder can import). `/sheet delete` erases it and every earlier version. I do not send sheets to any language model.
 **Limits:** totals are worked out from the file. Conditions, armour check penalties and temporary bonuses are not in it; put them in the extra modifier."""
 
@@ -45,10 +46,12 @@ def _slug(name: str) -> str:
 
 
 class DiceCommands:
-    def __init__(self, store: SheetStore, locations: Iterable[tuple[int, int]], rng: dice.Rng | None = None):
+    def __init__(self, store: SheetStore, locations: Iterable[tuple[int, int]], rng: dice.Rng | None = None,
+                 is_owner: Callable[[int], Awaitable[bool]] | None = None):
         self.store = store
         self.locations = tuple(locations)
         self.rng = rng
+        self.is_owner = is_owner  # who runs the bot; None means nobody, so /gm add and /gm remove always refuse
 
     # -- plumbing --------------------------------------------------------------------------------------------
     async def _send(self, interaction: Any, text: str, *, ephemeral: bool = True, **kw: Any) -> None:
@@ -251,6 +254,67 @@ class DiceCommands:
             return
         await self._send(interaction, f"Removed **{escape(comp.name)}** from **{escape(comp.character.name)}**.")
 
+    # -- /gm -------------------------------------------------------------------------------------------------
+    async def _owner_only(self, interaction: Any, what: str) -> bool:
+        if self.is_owner is not None:
+            try:
+                if await self.is_owner(interaction.user.id):
+                    return True
+            except Exception as exc:  # could not tell who owns the bot: refuse
+                log.error("owner check failed (%s)", type(exc).__name__)
+        await self._send(interaction, f"Only the bot's owner can {what}.")
+        return False
+
+    async def gm_add(self, interaction: Any, user: Any) -> None:
+        if not await self._owner_only(interaction, "add a GM"):
+            return
+        target = user.id
+        if target in self.store.gm_ids:
+            await self._send(interaction, f"<@{target}> is already a GM (set in the server's env file).")
+            return
+        try:
+            added = self.store.add_gm(target)
+        except Exception as exc:
+            await self._fail(interaction, exc)
+            return
+        await self._send(interaction, f"<@{target}> is now a GM." if added else f"<@{target}> is already a GM.")
+
+    async def gm_remove(self, interaction: Any, user: Any) -> None:
+        if not await self._owner_only(interaction, "remove a GM"):
+            return
+        target = user.id
+        try:
+            removed = self.store.remove_gm(target)
+        except Exception as exc:
+            await self._fail(interaction, exc)
+            return
+        env = target in self.store.gm_ids
+        if removed:
+            text = f"<@{target}> is no longer a GM."
+            if env:
+                text += " They are still a GM because the server's env file lists them; only the server's owner can change that."
+        elif env:
+            text = (f"<@{target}> is a GM through the server's env file (`SHEETS_GM_USER_IDS`), so this command cannot "
+                    "remove them. Edit the env file and restart the bot.")
+        else:
+            text = f"<@{target}> is not a GM."
+        await self._send(interaction, text)
+
+    async def gm_list(self, interaction: Any) -> None:
+        try:
+            added = sorted(self.store.added_gms() - self.store.gm_ids)
+        except Exception as exc:
+            await self._fail(interaction, exc)
+            return
+        env = sorted(self.store.gm_ids)
+        if not env and not added:
+            await self._send(interaction, "There are no GMs yet. The bot's owner can add one with `/gm add`.")
+            return
+        lines = ["**GMs** (may update, export and delete anyone's sheet)"]
+        lines += [f"- <@{u}> (set in the server's env file)" for u in env]
+        lines += [f"- <@{u}>" for u in added]
+        await self._send(interaction, "\n".join(lines))
+
     # -- autocomplete ----------------------------------------------------------------------------------------
     async def character_and_companion_choices(self, interaction: Any, current: str) -> list[app_commands.Choice[str]]:
         if not self.allowed(interaction):
@@ -382,6 +446,23 @@ def register_commands(tree: app_commands.CommandTree, cmds: DiceCommands) -> Non
     for name in ("show", "remove"):
         companion.get_command(name).autocomplete("character")(cmds.character_and_companion_choices)
 
+    gm = app_commands.Group(name="gm", description="Who may manage anyone's character sheet", guild_only=True)
+
+    @gm.command(name="add", description="Make a member a GM (bot owner only)")
+    @app_commands.describe(user="The member to make a GM")
+    async def gm_add(interaction: discord.Interaction, user: discord.Member):
+        await cmds.gm_add(interaction, user)
+
+    @gm.command(name="remove", description="Stop a member being a GM (bot owner only)")
+    @app_commands.describe(user="The member to remove")
+    async def gm_remove(interaction: discord.Interaction, user: discord.Member):
+        await cmds.gm_remove(interaction, user)
+
+    @gm.command(name="list", description="Show who is a GM")
+    async def gm_list(interaction: discord.Interaction):
+        await cmds.gm_list(interaction)
+
     tree.add_command(sheet)
     tree.add_command(character)
     tree.add_command(companion)
+    tree.add_command(gm)

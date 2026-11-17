@@ -230,7 +230,8 @@ def test_bot_registers_the_commands_and_syncs_only_to_configured_servers(tmp_pat
     store, _ = make(tmp_path)
     bot = AnalectaBot(agent=None, locations=[(GUILD, CHANNEL), (2, 20)], limiter=Limiter(0, 10), sheets=store)
     names = {c.name for c in bot.tree.get_commands()}
-    assert names == {"roll", "sheet", "character", "companion"}
+    assert names == {"roll", "sheet", "character", "companion", "gm"}
+    assert {c.name for c in bot.tree.get_command("gm").commands} == {"add", "remove", "list"}
     sheet = bot.tree.get_command("sheet")
     assert {c.name for c in sheet.commands} == {"help", "add", "show", "export", "delete"}
     assert {c.name for c in bot.tree.get_command("character").commands} == {"register", "list", "unregister"}
@@ -258,3 +259,120 @@ def test_register_commands_roll_option_names():
     roll = tree.get_command("roll")
     assert [p.name for p in roll.parameters] == ["what", "character", "secret", "companion"]
     assert [p.required for p in roll.parameters] == [True, False, False, False]
+
+
+# -- /gm ---------------------------------------------------------------------------------------------------
+OWNER, NEWGM = 7001, 7002
+
+
+def make_gm(tmp_path, owner=OWNER):
+    store = SheetStore(tmp_path / "sheets", gm_ids=[GM])
+
+    async def is_owner(uid):
+        return uid == owner
+    return store, DiceCommands(store, [(GUILD, CHANNEL)], None, is_owner)
+
+
+def test_gm_add_is_owner_only_and_persists(tmp_path):
+    store, cmds = make_gm(tmp_path)
+    nope = FakeInteraction(ALEX)
+    run(cmds.gm_add(nope, NS(id=NEWGM)))
+    assert "Only the bot's owner" in nope.texts[0] and nope.sent[0]["ephemeral"] is True
+    assert not store.is_gm(NEWGM)
+    ok = FakeInteraction(OWNER)
+    run(cmds.gm_add(ok, NS(id=NEWGM)))
+    assert "now a GM" in ok.texts[0] and ok.sent[0]["ephemeral"] is True
+    assert store.is_gm(NEWGM)
+    again = SheetStore(tmp_path / "sheets")  # a fresh store reads it back from disk
+    assert again.is_gm(NEWGM) and not again.is_gm(ALEX)
+    dup = FakeInteraction(OWNER)
+    run(cmds.gm_add(dup, NS(id=NEWGM)))
+    assert "already a GM" in dup.texts[0]
+
+
+def test_gm_added_from_discord_can_manage_sheets(tmp_path):
+    store, cmds = make_gm(tmp_path)
+    add(cmds, ALEX)
+    blocked = FakeInteraction(NEWGM)
+    run(cmds.sheet_export(blocked, "test hero"))
+    assert "file" not in blocked.sent[0]
+    run(cmds.gm_add(FakeInteraction(OWNER), NS(id=NEWGM)))
+    allowed = FakeInteraction(NEWGM)
+    run(cmds.sheet_export(allowed, "test hero"))
+    assert "file" in allowed.sent[0]
+
+
+def test_gm_remove_is_owner_only_and_keeps_env_gms(tmp_path):
+    store, cmds = make_gm(tmp_path)
+    run(cmds.gm_add(FakeInteraction(OWNER), NS(id=NEWGM)))
+    nope = FakeInteraction(GM)
+    run(cmds.gm_remove(nope, NS(id=NEWGM)))
+    assert "Only the bot's owner" in nope.texts[0] and store.is_gm(NEWGM)
+    ok = FakeInteraction(OWNER)
+    run(cmds.gm_remove(ok, NS(id=NEWGM)))
+    assert "no longer a GM" in ok.texts[0] and not store.is_gm(NEWGM)
+    env = FakeInteraction(OWNER)
+    run(cmds.gm_remove(env, NS(id=GM)))
+    assert "env file" in env.texts[0] and store.is_gm(GM)
+    none = FakeInteraction(OWNER)
+    run(cmds.gm_remove(none, NS(id=ALEX)))
+    assert "not a GM" in none.texts[0]
+
+
+def test_gm_env_gm_is_not_stored_by_add(tmp_path):
+    store, cmds = make_gm(tmp_path)
+    ix = FakeInteraction(OWNER)
+    run(cmds.gm_add(ix, NS(id=GM)))
+    assert "env file" in ix.texts[0] and not (tmp_path / "sheets" / "gms.json").exists()
+
+
+def test_gm_list_is_open_to_anyone_and_labels_env_gms(tmp_path):
+    store, cmds = make_gm(tmp_path)
+    run(cmds.gm_add(FakeInteraction(OWNER), NS(id=NEWGM)))
+    ix = FakeInteraction(ALEX)
+    run(cmds.gm_list(ix))
+    text = ix.texts[0]
+    assert f"<@{GM}> (set in the server's env file)" in text and f"- <@{NEWGM}>" in text
+    assert ix.sent[0]["ephemeral"] is True
+    empty = DiceCommands(SheetStore(tmp_path / "other"), [(GUILD, CHANNEL)])
+    ix2 = FakeInteraction(ALEX)
+    run(empty.gm_list(ix2))
+    assert "no GMs" in ix2.texts[0]
+
+
+def test_gm_owner_check_fails_closed(tmp_path):
+    store = SheetStore(tmp_path / "sheets")
+
+    async def broken(uid):
+        raise RuntimeError("discord down")
+    for cmds in (DiceCommands(store, [(GUILD, CHANNEL)]), DiceCommands(store, [(GUILD, CHANNEL)], None, broken)):
+        ix = FakeInteraction(OWNER)
+        run(cmds.gm_add(ix, NS(id=NEWGM)))
+        assert "Only the bot's owner" in ix.texts[0] and not store.is_gm(NEWGM)
+
+
+def test_corrupt_gms_file_means_no_added_gms(tmp_path):
+    store = SheetStore(tmp_path, gm_ids=[GM])
+    (tmp_path / "gms.json").write_text('{"user_ids": ["x", true, -1, 5, 7.5]}')
+    assert store.added_gms() == frozenset({5})
+    (tmp_path / "gms.json").write_text("not json")
+    assert store.added_gms() == frozenset() and store.is_gm(GM)
+
+
+def test_bot_app_owner_check(tmp_path):
+    store, _ = make(tmp_path)
+    bot = AnalectaBot(agent=None, locations=[(GUILD, CHANNEL)], limiter=Limiter(0, 10), sheets=store)
+    calls = []
+
+    async def info():
+        calls.append(1)
+        return NS(owner=NS(id=OWNER), team=None)
+    bot.application_info = info
+    assert run(bot._is_app_owner(OWNER)) is True and run(bot._is_app_owner(ALEX)) is False
+    assert len(calls) == 1  # looked up once, then cached
+
+    async def team_info():
+        return NS(owner=NS(id=1), team=NS(owner_id=OWNER))
+    bot2 = AnalectaBot(agent=None, locations=[(GUILD, CHANNEL)], limiter=Limiter(0, 10), sheets=store)
+    bot2.application_info = team_info
+    assert run(bot2._is_app_owner(OWNER)) is True and run(bot2._is_app_owner(1)) is False

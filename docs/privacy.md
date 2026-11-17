@@ -24,7 +24,7 @@ bot restarts. It stores only what a member asks it to keep, on the group's serve
   Discord user ID of the person who uploaded it (its owner), the character's name and the times it was added. The
   bot keeps the last 10 uploads of each sheet, so an update does not lose the one before. It also keeps a list of
   which Discord user ID plays which character (`/character register`), which the bot also uses to know which
-  campaign note is a member's character when answering questions about the notes. These are plain files in a
+  campaign note is a member's character when answering questions about the notes, and the Discord user IDs of any GMs the bot's owner added with `/gm add`. These are plain files in a
   folder (`/var/lib/analecta/sheets` by default) that only the bot's service account can read. If a character has an
   eidolon, a member can also save it with `/companion add`: its name, kind, six ability modifiers and optional AC,
   stored with that character and kept like it (last 10 versions, erased with the sheet). They are

@@ -45,11 +45,21 @@ class AnalectaBot(discord.Client):
         self.corrections = corrections
         self.owner = owner
         self._slots = asyncio.Semaphore(2)
+        self._owner_ids: frozenset[int] | None = None
         self.tree: AnalectaTree | None = None
         if sheets is not None:  # slash commands: dice and character sheets, in the configured channels only
-            commands = DiceCommands(sheets, self.locations, rng)  # type: ignore[arg-type]
+            commands = DiceCommands(sheets, self.locations, rng, self._is_app_owner)  # type: ignore[arg-type]
             self.tree = AnalectaTree(self, commands)
             register_commands(self.tree, commands)
+
+    async def _is_app_owner(self, user_id: int) -> bool:
+        """True if this Discord user owns the bot's application (or, for a team, is the team's owner)."""
+        if self._owner_ids is None:
+            app = await self.application_info()
+            team = getattr(app, "team", None)
+            owner = team.owner_id if team else getattr(app.owner, "id", None)
+            self._owner_ids = frozenset({owner} if owner else ())
+        return user_id in self._owner_ids
 
     async def setup_hook(self) -> None:
         """Sync the slash commands to each configured server only (guild commands appear at once)."""
