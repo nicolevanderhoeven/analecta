@@ -65,7 +65,7 @@ optionally `BOT_OWNER` (your name, shown in the help text and pinned note; unset
 optionally `CORRECTIONS_DIR` (default `/srv/analecta/corrections`; it must not be inside or around `NOTES_DIR`),
 optionally `SHEETS_DIR` (default `/var/lib/analecta/sheets`, where saved character sheets live; see
 [sheets.md](sheets.md). `setup-droplet.sh` creates it, and `deploy/analecta.service` lists it under `ReadWritePaths`, so
-edit that line too if you move it) and `SHEETS_GM_USER_IDS` (optional),
+edit that line too if you move it) and `SHEETS_GM_USER_IDS` (optional; the bot's owner can add more GMs from Discord, see [operations.md](operations.md#managing-gms)),
 the Discord token the same way)
 and then `chown root:analecta /etc/analecta/analecta.env && chmod 640 /etc/analecta/analecta.env`.
 
@@ -130,7 +130,7 @@ folder; Syncthing deletes it on the server and keeps a copy in `.stversions`. Pu
    History. Invite the bot with scopes `bot` and `applications.commands` and no extra permissions (`bot` already
    includes the slash-command scope; writing both is harmless, and a re-invite is needed only if `/roll` does not
    appear). Anyone who can post in the channel may use it; channel permissions are the access control. The slash
-   commands (`/roll`, `/sheet`, `/character`) are registered to each configured server only, and the bot refuses
+   commands (`/roll`, `/sheet`, `/character`, `/companion`, `/gm`) are registered to each configured server only, and the bot refuses
    them in any other channel with a private pointer to the right one.
 3. Put the server and channel IDs in the env file as `DISCORD_CHANNELS=<SERVER_ID>:<CHANNEL_ID>` (Discord Developer
    Mode, Copy ID). The older `DISCORD_GUILD_ID` plus `DISCORD_CHANNEL_ID` pair still works as one entry; `DISCORD_CHANNEL_ID` without
