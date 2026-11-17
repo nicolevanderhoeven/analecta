@@ -128,7 +128,38 @@ class SheetStore:
 
     # -- reading ---------------------------------------------------------------------------------------------
     def is_gm(self, user_id: int) -> bool:
-        return user_id in self.gm_ids
+        """A GM is anyone in the env-file list (`gm_ids`) or added with `/gm add` (`gms.json`)."""
+        return user_id in self.gm_ids or user_id in self.added_gms()
+
+    # -- GMs added from Discord: <dir>/gms.json {"user_ids": [...]} ------------------------------------------
+    def added_gms(self) -> frozenset[int]:
+        try:
+            raw = json.loads((self.root / "gms.json").read_text(encoding="utf-8"))
+            ids = raw["user_ids"]
+        except (OSError, ValueError, KeyError, TypeError):
+            return frozenset()
+        if not isinstance(ids, list):
+            return frozenset()
+        return frozenset(i for i in ids if isinstance(i, int) and not isinstance(i, bool) and i > 0)
+
+    def _write_gms(self, ids: Iterable[int]) -> None:
+        self.root.mkdir(parents=True, exist_ok=True)
+        _atomic_write(self.root / "gms.json", json.dumps({"user_ids": sorted(set(ids))}).encode())
+
+    def add_gm(self, user_id: int) -> bool:
+        """Register a GM. False if they already are one (from the env file or an earlier add); nothing is written."""
+        if self.is_gm(user_id):
+            return False
+        self._write_gms(self.added_gms() | {user_id})
+        return True
+
+    def remove_gm(self, user_id: int) -> bool:
+        """Remove a GM added from Discord. False if they were not added that way (env-file GMs stay)."""
+        added = self.added_gms()
+        if user_id not in added:
+            return False
+        self._write_gms(added - {user_id})
+        return True
 
     def list(self) -> list[SheetInfo]:
         out: list[SheetInfo] = []
