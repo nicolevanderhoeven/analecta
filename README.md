@@ -39,11 +39,9 @@ Not published, endorsed, or specifically approved by Paizo.
   `ANALECTA_CHARACTER_MAP` maps Discord user IDs to character notes for members whose names do not match.
 - **Rules come live from Archives of Nethys** through the site's own search backend, with a link to the exact page,
   a short cache, a low request rate, a back-off on failures and a switch to turn it off (`AON_ENABLED=false`).
-- **Dice and character sheets.** Slash commands in the same channel: `/roll 1d20+5` for plain dice, and
-  `/roll Religion -2` for a skill, save, Perception or Lore from a character sheet the player imported with
-  `/sheet add` (a Pathbuilder 2e JSON file), plus an extra modifier. Each player is registered to a character
-  (`/character register`), so a roll uses their own by default, and anyone can roll for another character with
-  `character:`. An eidolon can be attached to a character (`/companion add`) and rolled too. Plain code, no language model: sheets are never sent to OpenAI (only a companion's name and kind go with a question). See [docs/sheets.md](docs/sheets.md).
+- **Dice and character sheets.** Slash commands in the same channel, in plain code with no language model: sheets are
+  never sent to OpenAI (only a companion's name and kind go with a question). See [Commands](#commands) and
+  [docs/sheets.md](docs/sheets.md).
 - **The group can correct it.** Reply to an answer with `/correct <the fix>` and it is saved as a *table correction*
   (with who and when) in `corrections.md`; later answers use those ahead of the notes and say so. A 👎 on an answer,
   or a reply saying "wrong", logs the question and answer to a review list, `misreads.md`. Both live outside the
@@ -58,6 +56,79 @@ Not published, endorsed, or specifically approved by Paizo.
   drops "Secret goals" sections, notes with `met: false`, notes with `bot: false`, `%% hidden %%` blocks (and drawing
   data), transcript embeds and email addresses. It refuses to run if the export folder holds anything it did not put
   there.
+
+## Commands
+
+Everything is used in the configured channel (or a thread under it); elsewhere the bot answers privately with a pointer
+to the right channel. Slash-command replies are private to the person who ran them, except `/roll`, which the channel
+sees. `[x]` marks an optional option. Details, rules and storage are in [docs/sheets.md](docs/sheets.md).
+
+**Who may use what:** *anyone* in the channel; *sheet owner* (whoever added that sheet); *GM* (a member listed in
+`SHEETS_GM_USER_IDS` or added with `/gm add`); *bot owner* (owner of the bot's Discord application).
+
+### Questions
+
+| Use | What it does | Who |
+|---|---|---|
+| `@Analecta <question>` (or reply to one of its messages) | Answers a rules or campaign question; reply again to continue. | Anyone |
+| `@Analecta help` | Posts the help text (the [pinned note](docs/pinned-note.md)). | Anyone |
+| Reply to an answer with `/correct <the fix>` (`!correct` also works) | Saves a table correction, up to 500 characters. Not a registered slash command: it only works as a reply to one of the bot's answers. A 👎 or a reply saying "wrong" flags a misread instead. | Anyone |
+
+### Dice and sheets
+
+| Command | Options | What it does | Who |
+|---|---|---|---|
+| `/roll` | `what`; `[character]`; `[secret]`; `[companion]` | Rolls dice (`1d20+5`, `4d6kh3`) or a skill, save, Perception or Lore from a saved sheet with an extra modifier (`Religion -2`). `character` rolls for another character or companion; `secret:True` shows the result only to you; `companion:True` rolls as your own character's companion. | Anyone |
+| `/sheet help` | none | Steps to export from Pathbuilder 2e and add the file. | Anyone |
+| `/sheet add` | `file` | Adds or updates a character from a Pathbuilder 2e JSON file. Registers you to it if you have none. | Anyone (becomes the sheet's owner); updating needs the owner or a GM |
+| `/sheet show` | `[character]` | A readable summary: abilities, HP, AC, Perception, saves, skills, Lores, feats. | Anyone |
+| `/sheet export` | `[character]` | Returns the saved JSON file. | Sheet owner or GM |
+| `/sheet delete` | `[character]`; `confirm` | Erases the sheet and every earlier version. Needs `confirm:True`. | Sheet owner or GM |
+
+```
+/roll what:1d20+5
+/roll what:Religion -2 secret:True
+/roll what:Athletics character:Ash
+/sheet add file:<attach your .json>
+```
+
+`character` defaults to your own registered character in `/sheet` commands.
+
+### Characters
+
+| Command | Options | What it does | Who |
+|---|---|---|---|
+| `/character register` | `character`; `[user]` | Links you (or `user`) to a saved character, so `/roll` uses it by default. | Anyone for themselves and for a character nobody holds; otherwise the sheet owner or a GM |
+| `/character unregister` | `[user]` | Removes the link; the sheet stays. | You; for someone else, the sheet owner or a GM |
+| `/character list` | none | Saved characters and who plays each. | Anyone |
+
+### Companions (eidolons)
+
+| Command | Options | What it does | Who |
+|---|---|---|---|
+| `/companion add` | `character`; `name`; `kind` (`eidolon`); `str`, `dex`, `con`, `int`, `wis`, `cha` (modifiers); `[ac]` | Attaches an eidolon, or updates it if the name exists. Its saves, Perception and skills use the summoner's proficiency and item bonuses. Up to four per character. | Sheet owner or GM |
+| `/companion show` | `[character]` | The companions and their totals. `character` may be a character or a companion's name. | Anyone |
+| `/companion remove` | `[character]`; `[name]` | Removes a companion. | Sheet owner or GM |
+
+```
+/companion add character:Zuhri name:Ash kind:eidolon str:4 dex:3 con:4 int:0 wis:1 cha:0
+/roll what:Athletics character:Ash
+/roll what:Athletics companion:True
+```
+
+### GMs
+
+| Command | Options | What it does | Who |
+|---|---|---|---|
+| `/gm list` | none | Who the GMs are; those set in the env file are marked. | Anyone |
+| `/gm add` | `user` | Makes a member a GM. | Bot owner |
+| `/gm remove` | `user` | Stops a member being a GM. A GM listed in `SHEETS_GM_USER_IDS` stays one: edit the env file and restart. | Bot owner |
+
+### Admin (not slash commands)
+
+- `python -m analecta pinned` prints the help text to pin; `BOT_OWNER` adds the owner's name to it.
+- Settings such as `SHEETS_GM_USER_IDS`, `SHEETS_DIR`, the spend cap and the switches are in
+  [docs/operations.md](docs/operations.md).
 
 ## Public repository, no private information
 
