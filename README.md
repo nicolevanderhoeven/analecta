@@ -37,6 +37,9 @@ Not published, endorsed, or specifically approved by Paizo.
 - **It knows which character is asking.** If the asker's server nickname or display name equals a player character
   note's name or alias (type `pc`, case-insensitive), "my", "me" and "I" mean that character; otherwise it asks which.
   `ANALECTA_CHARACTER_MAP` maps Discord user IDs to character notes for members whose names do not match.
+- **It respects pronouns.** Add `pronouns: they/them` (or a list) to a character note's frontmatter (PCs and NPCs
+  alike). The digest, the asker's character and the notes it reads carry them, and the bot uses them for that
+  character; a note with no `pronouns` gets the character's name, never a guessed pronoun.
 - **Rules come live from Archives of Nethys** through the site's own search backend, with a link to the exact page,
   a short cache, a low request rate, a back-off on failures and a switch to turn it off (`AON_ENABLED=false`).
 - **Dice and character sheets.** Slash commands in the same channel, in plain code with no language model: sheets are

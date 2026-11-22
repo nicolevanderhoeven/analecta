@@ -97,6 +97,15 @@ class NoteInfo:
         return [self.title, *[a for a in extra if a.strip()]]
 
     @property
+    def pronouns(self) -> str:
+        """The `pronouns` frontmatter of a person note (a string or a list), joined with ", "; empty when absent."""
+        if self.note_type not in PERSON_TYPES:
+            return ""
+        value = self.meta.get("pronouns")
+        items = value if isinstance(value, list) else [value]
+        return ", ".join(" ".join(v.split()) for v in items if isinstance(v, str) and v.strip())
+
+    @property
     def one_liner(self) -> str:
         for key in ("summary", "description"):
             value = self.meta.get(key)
@@ -403,7 +412,7 @@ class NotesStore:
         for i in sessions:
             lines.append(f"{i.session_number:03d} {_fmt_date(i.session_date)}: {i.one_liner[:240]}")
         lines.append("")
-        lines.append("NOTES (name [type] (aliases): description):")
+        lines.append("NOTES (name [type] (aliases) (pronouns): description):")
         for i in entities:
             aliases = i.meta.get("aliases")
             alias_text = ""
@@ -413,8 +422,9 @@ class NotesStore:
                 alias_text = f" ({aliases})"
             ntype = i.meta.get("type")
             tag = f" [{ntype}]" if isinstance(ntype, str) and ntype else ""
+            pron = f" (pronouns: {i.pronouns})" if i.pronouns else ""
             desc = i.one_liner[:180]
-            lines.append(f"{i.title}{tag}{alias_text}: {desc}".rstrip(": "))
+            lines.append(f"{i.title}{tag}{alias_text}{pron}: {desc}".rstrip(": "))
         text = "\n".join(lines)
         if len(text) > budget_chars:
             text = text[:budget_chars].rsplit("\n", 1)[0] + "\n[digest truncated]"
