@@ -229,7 +229,8 @@ class Agent:
             calls.append(call)
             outputs.append(Message(role="tool", tool_call_id=call.id, text=(
                 f"The person asking plays the player character {character.title} (note {character.path}). When they "
-                f"say my, me or I, they mean {character.title}, unless they name someone else.")))
+                f"say my, me or I, they mean {character.title}, unless they name someone else."
+                + (f" {character.title}'s pronouns are {character.pronouns}." if character.pronouns else ""))))
             if (OWNERSHIP_RE.search(question) or (not infos and FIRST_PERSON_RE.search(question))) and all(i.path != character.path for i in infos):
                 infos.insert(0, character)
         self._companion_context(asker, question, character, infos, calls, outputs)
