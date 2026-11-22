@@ -134,6 +134,12 @@ def test_secret_callout_dropped():
     assert "hidden stuff" not in clean and "next" in clean and dropped == 1
 
 
+def test_pronouns_frontmatter_kept():
+    for value in ("they/them", "[she/her, they/them]"):
+        clean, _, _ = ex.sanitize_note(f"---\ntype: npc\npronouns: {value}\nsecret: x\n---\nbody")
+        assert f"pronouns: {value}" in clean and "secret:" not in clean
+
+
 def test_bot_false_tag_variants():
     for tag in ("bot: false", "bot/false", "bot-false"):
         clean, reason, _ = ex.sanitize_note(f"---\ntags:\n  - {tag}\n---\nx")

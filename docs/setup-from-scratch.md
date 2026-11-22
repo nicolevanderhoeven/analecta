@@ -96,6 +96,7 @@ A note may start with a YAML block between `---` lines. The export keeps only th
 | `aliases` | Other names for the thing (a list). The bot also matches a question that names the note by an alias. |
 | `description` | One sentence about the note. Goes into the digest the bot always carries. |
 | `summary` | A one-line summary, preferred over `description` for the digest. Session notes should have one. |
+| `pronouns` | A character's pronouns, for example `they/them` (or a list). The bot always uses them for that character. |
 | `date`, `session` | Date and session number, kept as written. |
 | `tags` | Kept. A tag `bot/false` (or `bot:false`) excludes the note, see below. |
 

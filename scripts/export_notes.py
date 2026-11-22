@@ -34,7 +34,7 @@ from analecta import frontmatter  # noqa: E402
 MANIFEST = ".analecta-export-manifest.json"
 TMP_PREFIX = ".analecta-tmp-"
 SYNCTHING_ENTRIES = {".stfolder", ".stignore", ".stversions"}
-KEEP_KEYS = {"type", "aliases", "description", "summary", "date", "session", "tags"}
+KEEP_KEYS = {"type", "aliases", "description", "summary", "date", "session", "tags", "pronouns"}
 SKIP_DIR_NAMES = {"granola", "transcripts", "plugins"}
 
 EXCALIDRAW = re.compile(r"\n(?:%%\n)?(?:# Excalidraw Data|#{1,3} Text Elements)")
